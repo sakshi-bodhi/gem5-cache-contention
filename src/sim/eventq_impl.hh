@@ -37,6 +37,7 @@
 
 #include "base/trace.hh"
 #include "sim/eventq.hh"
+#include "debug/PktTrace.hh"
 
 inline void
 EventQueue::schedule(Event *event, Tick when, bool global)
@@ -46,6 +47,15 @@ EventQueue::schedule(Event *event, Tick when, bool global)
     assert(event->initialized());
 
     event->setWhen(when, this);
+
+//    DPRINTF(PktTrace, "%s: ScheduleEvent:\t %ld \t %s: \t %d\n", when, event->name(), event->description(), getHead()->instance);
+
+    //-----CHANGED----
+//    if(event->name().compare("system.mem_ctrls.wrapped_event")) {
+//    	//event.
+//    }
+//        std::cout << curTick() << "\tScheduled Event: " << event->name() << "\t" << event->description() << "\t" << event->when() << "\n";
+    //-----CHANGED----
 
     // The check below is to make sure of two things
     // a. a thread schedules local events on other queues through the asyncq
@@ -72,6 +82,7 @@ EventQueue::deschedule(Event *event)
     assert(!inParallelMode || this == curEventQueue());
 
     remove(event);
+//    DPRINTF(PktTrace, "%s: DescheduleEvent:\t %s: \t %d\n", event->name(), event->description(), getHead()->instance);
 
     event->flags.clear(Event::Squashed);
     event->flags.clear(Event::Scheduled);

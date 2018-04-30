@@ -47,7 +47,7 @@
  * Port object definitions.
  */
 #include "mem/port.hh"
-
+#include "debug/DelayPath.hh"
 #include "base/trace.hh"
 #include "mem/mem_object.hh"
 
@@ -134,6 +134,12 @@ MasterPort::bind(BaseSlavePort& slave_port)
     SlavePort* cast_slave_port = dynamic_cast<SlavePort*>(&slave_port);
 
     // if this port is compatible, then proceed with the binding
+
+//    std::cout << "bind: _masterPort id=" << this->getId() << "_masterPort name=" << this->name() << "\n";
+//    std::cout << "bind: _baseSlavePort id=" << _baseSlavePort->getId() << "_baseSlavePort name=" << _baseSlavePort->name() << "\n";
+   // std::cout << "bind: cast_slave_port id=" << cast_slave_port->getId() << "cast_slave_port name=" << cast_slave_port->name() << "\n";
+    //std::cout << "bind: cast_slave_port=" << cast_slave_port << "\t ";
+
     if (cast_slave_port != NULL) {
         // master port keeps track of the slave port
         _slavePort = cast_slave_port;
@@ -180,6 +186,36 @@ bool
 MasterPort::sendTimingReq(PacketPtr pkt)
 {
     assert(pkt->isRequest());
+
+    //    -----CHANGED----
+//    if(pkt->getAddr() == 960){
+//    	std::cout << curTick() <<"\t" << pkt->getAddr() << "\tPacketQueue::schedSendTiming()\t" << name() << "\n";
+//    	std::cout << "\t\theaderDelay " <<pkt->headerDelay << "\tpayloadDelay " << pkt->payloadDelay << "\n";
+//    	//	    	std::cout << "Packet=" << pkt->getAddr() << "\tCache::recvTimingResp()\t" << name() << "\tcurTick: "<< curTick() << "\n";
+//    	}
+//    //    -----CHANGED----
+//    //    -----CHANGED----
+//        if(pkt->getAddr() == 960){
+//        	std::cout << curTick() << "\t" << pkt->getAddr() << "\tMasterPort::sendTimingReq()\t" << name() << "\n";
+//        	std::cout << "SlavePort- " << _slavePort->name() << "\n";
+//        	std::cout << "\t\t\tpkt headerDelay " << pkt->headerDelay << "\tpayLoadDelay " << pkt->payloadDelay << "\n";
+//        }
+//        if((!name().compare("system.membus.master[4]")) && pkt->getAddr() == 960){
+//        	std::cout << "Going to access membus!!\n";
+//        }
+    //    -----CHANGED----
+
+    //-----CHANGED----
+//    std::cout << "Packet addr=" << pkt->getAddr() << "\n";
+//          std::cout << "sendTimingReq(): MasterPort sending timing req to slave port=" << _slavePort->name() << " with id=" << _slavePort->getId() << ", owner of the port=" << _slavePort->owner.name() << "\n";
+    //-----CHANGED----
+
+    //-----CHANGED----
+//      std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tRequest" << "\n";
+      addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "Req", false, 2);
+      //-----CHANGED----
+      std::cout << curTick() << "\tTrace " << name() << " sendTimingReq(port.cc):\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
+
     return _slavePort->recvTimingReq(pkt);
 }
 
@@ -187,12 +223,26 @@ bool
 MasterPort::sendTimingSnoopResp(PacketPtr pkt)
 {
     assert(pkt->isResponse());
+
+    //-----CHANGED----
+//    std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tSnoopResp" << "\n";
+    addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "SnoopResp", false, 2);
+    //-----CHANGED----
+    std::cout << curTick() << "\tTrace " << name() << " sendTimingSnoopResp(port.cc):\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
+
     return _slavePort->recvTimingSnoopResp(pkt);
 }
 
 void
 MasterPort::sendRetryResp()
 {
+	  //    -----CHANGED----
+//	        if(pkt->getAddr() == 960){
+//	        	std::cout << "Packet=" << pkt->getAddr() << "\tMasterPort::sendRetryResp()\t" << name() << "\tcurTick: "<< curTick() << "\n";
+//	        }
+	    //    -----CHANGED----
+    std::cout << curTick() << "\tTrace " << name() << " sendRetryResp(port.cc):\n";
+
     _slavePort->recvRespRetry();
 }
 
@@ -231,6 +281,9 @@ SlavePort::bind(MasterPort& master_port)
 {
     _baseMasterPort = &master_port;
     _masterPort = &master_port;
+
+//    std::cout << "bind: _slavePort id=" << this->getId() << "_slavePort name=" << this->name() << "\n";
+//    std::cout << "bind: _baseMasterPort id=" << _baseMasterPort->getId() << "_baseMasterPort name=" << _baseMasterPort->name() << "\n";
 }
 
 Tick
@@ -251,6 +304,24 @@ bool
 SlavePort::sendTimingResp(PacketPtr pkt)
 {
     assert(pkt->isResponse());
+
+    //    -----CHANGED----
+//           if(pkt->getAddr() == 960){
+//           	std::cout << curTick() << "\t" << pkt->getAddr() << "\tSlavePort::sendTimingResp()\t" << name() << "\n";
+//           	std::cout << "MasterPort- " << _masterPort->name() << "\n";
+//           	std::cout << "\t\t\tpkt headerDelay " << pkt->headerDelay << "\tpayLoadDelay " << pkt->payloadDelay << "\n";
+//           }
+//           if((!name().compare("system.membus.master[4]")) && pkt->getAddr() == 960){
+//           	std::cout << "Going to access membus!!\n";
+//           }
+       //    -----CHANGED----
+
+    //-----CHANGED----
+//      std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tResponse" << "\n";
+      addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "Resp", false, 2);
+      //-----CHANGED----
+      std::cout << curTick() << "\tTrace " << name() << " sendTimingResp(port.cc):\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
+
     return _masterPort->recvTimingResp(pkt);
 }
 
@@ -258,17 +329,35 @@ void
 SlavePort::sendTimingSnoopReq(PacketPtr pkt)
 {
     assert(pkt->isRequest());
+
+    //-----CHANGED----
+//      std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tSnoopReq" << "\n";
+      addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "SnoopReq", false, 2);
+      //-----CHANGED----
+
+      std::cout << curTick() << "\tTrace " << name() << " sendTimingSnoopReq(port.cc):\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
+
     _masterPort->recvTimingSnoopReq(pkt);
 }
 
 void
 SlavePort::sendRetryReq()
 {
+	  //    -----CHANGED----
+//	        if(pkt->getAddr() == 960){
+//	        	std::cout << "Packet=" << pkt->getAddr() << "\tSlavePort::sendRetryReq()\t" << name() << "\tcurTick: "<< curTick() << "\n";
+//	        }
+	    //    -----CHANGED----
+
+    std::cout << curTick() << "\tTrace " << name() << " sendRetryReq(port.cc):\n";
+
     _masterPort->recvReqRetry();
 }
 
 void
 SlavePort::sendRetrySnoopResp()
 {
+    std::cout << curTick() << "\tTrace " << name() << " sendRetrySnoopResp(port.cc):\n";
+
     _masterPort->recvRetrySnoopResp();
 }

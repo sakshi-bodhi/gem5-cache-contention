@@ -64,6 +64,7 @@ Bridge::BridgeSlavePort::BridgeSlavePort(const std::string& _name,
       outstandingResponses(0), retryReq(false),
       respQueueLimit(_resp_limit), sendEvent(*this)
 {
+    std::cout << "---Bridge--- \t slavePort name" << _name << "\n";
 }
 
 Bridge::BridgeMasterPort::BridgeMasterPort(const std::string& _name,
@@ -73,6 +74,7 @@ Bridge::BridgeMasterPort::BridgeMasterPort(const std::string& _name,
     : MasterPort(_name, &_bridge), bridge(_bridge), slavePort(_slavePort),
       delay(_delay), reqQueueLimit(_req_limit), sendEvent(*this)
 {
+	   std::cout << "---Bridge--- \t masterPort name" << _name << "\n";
 }
 
 Bridge::Bridge(Params *p)
@@ -82,6 +84,7 @@ Bridge::Bridge(Params *p)
       masterPort(p->name + ".master", *this, slavePort,
                  ticksToCycles(p->delay), p->req_size)
 {
+//	   std::cout << "---Bridge (connecting)---\tmasterPort" << masterPort << "\t slavePort" << slavePort << "\n";
 }
 
 BaseMasterPort&
@@ -152,6 +155,16 @@ Bridge::BridgeMasterPort::recvTimingResp(PacketPtr pkt)
 bool
 Bridge::BridgeSlavePort::recvTimingReq(PacketPtr pkt)
 {
+
+//	std::cout << "recvTimingReq in Bridgeslaveport\n";
+
+	//    -----CHANGED----
+    if(pkt->getAddr() == 960){
+    	std::cout << curTick() << "\t" << pkt->getAddr() << "\tBridgeSlavePort::recvTimingReq()\t" << name() << "\n";
+    	std::cout << "\t\t\tpkt_headerDelay " << pkt->headerDelay << "\tpayLoadDelay " << pkt->payloadDelay << "\n";
+    }
+    //    -----CHANGED----
+
     DPRINTF(Bridge, "recvTimingReq: %s addr 0x%x\n",
             pkt->cmdString(), pkt->getAddr());
 

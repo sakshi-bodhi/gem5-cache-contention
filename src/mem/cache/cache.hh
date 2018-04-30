@@ -57,6 +57,7 @@
 #include "mem/cache/base.hh"
 #include "mem/cache/blk.hh"
 #include "mem/cache/mshr.hh"
+#include "mem/cache/mshr_queue.hh"
 #include "mem/cache/tags/base.hh"
 #include "params/Cache.hh"
 #include "sim/eventq.hh"
@@ -187,6 +188,11 @@ class Cache : public BaseCache
         MemSidePort(const std::string &_name, Cache *_cache,
                     const std::string &_label);
     };
+
+
+	int reachedLLC;
+	uint64_t coreToLLCDelay;
+
 
     /** Tag and data Storage */
     BaseTags *tags;

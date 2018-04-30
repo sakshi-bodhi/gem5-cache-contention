@@ -73,6 +73,12 @@
 #include "sim/sim_exit.hh"
 #include "sim/system.hh"
 
+
+
+//	static bool isL2Cache = false;	//if the cache is L2 then add the miss request in MSHR of L2 as well as in the l3ReqQueue
+	static MSHRQueue* ptrTol3ReqQueue = NULL;
+	static WriteQueue* ptrTol3WBReqQueue = NULL;
+
 /**
  * A basic cache interface. Implements some common functions for speed.
  */
@@ -88,6 +94,7 @@ class BaseCache : public MemObject
     };
 
   public:
+
     /**
      * Reasons for caches to be blocked.
      */
@@ -122,6 +129,9 @@ class BaseCache : public MemObject
         {
             DPRINTF(CachePort, "Scheduling send event at %llu\n", time);
             reqQueue.schedSendEvent(time);
+            //------CHANGED------
+//            std::cout << "reqQueue name- " << reqQueue.name() << "\n";
+            //------CHANGED------
         }
 
       protected:
@@ -186,6 +196,7 @@ class BaseCache : public MemObject
     CacheMasterPort *memSidePort;
 
   protected:
+
 
     /** Miss status registers */
     MSHRQueue mshrQueue;
@@ -325,6 +336,12 @@ class BaseCache : public MemObject
     const AddrRangeList addrRanges;
 
   public:
+
+    //--------CHANGED----------
+       	MSHRQueue l3ReqQueue;	//stores the requests in all the mshrs of L2 caches
+       	WriteQueue l3WBReqQueue;	//stores the requests in all the write buffers of L2 caches
+       //--------CHANGED----------
+
     /** System we are currently operating in. */
     System *system;
 
@@ -490,11 +507,22 @@ class BaseCache : public MemObject
 
     const AddrRangeList &getAddrRanges() const { return addrRanges; }
 
-    MSHR *allocateMissBuffer(PacketPtr pkt, Tick time, bool sched_send = true)
+
+//    MSHRQueue* BaseCache::l3ReqQueue("l3ReqQueue", 512, 1, 1);
+//        BaseCache::isL2Cache = false;
+
+    MSHR *allocateMissBuffer(PacketPtr pkt, Tick time, std::string cacheName, bool sched_send = true)
     {
         MSHR *mshr = mshrQueue.allocate(blockAlign(pkt->getAddr()), blkSize,
                                         pkt, time, order++,
-                                        allocOnFill(pkt->cmd));
+                                        allocOnFill(pkt->cmd), cacheName);
+        //--------CHANGED----------
+        if(cacheName.find("l2") != std::string::npos) {
+//     	   std::cout << curTick() << "\t" << pkt->getAddr() <<" -> Packet came into global mshr_queue for cache " << cacheName << "\n";
+        	ptrTol3ReqQueue->allocateL3RQ(mshr, cacheName);
+//        	ptrTol3ReqQueue->dump();
+        }
+        //--------CHANGED----------
 
         if (mshrQueue.isFull()) {
             setBlocked((BlockedCause)MSHRQueue_MSHRs);
@@ -502,13 +530,14 @@ class BaseCache : public MemObject
 
         if (sched_send) {
             // schedule the send
+//      	   std::cout << curTick() << "\tschedMemSideEvent for " << cacheName << "\t" << time << "\n";
             schedMemSideSendEvent(time);
         }
 
         return mshr;
     }
 
-    void allocateWriteBuffer(PacketPtr pkt, Tick time)
+    void allocateWriteBuffer(PacketPtr pkt, Tick time, std::string cacheName)
     {
         // should only see writes or clean evicts here
         assert(pkt->isWrite() || pkt->cmd == MemCmd::CleanEvict);
@@ -521,7 +550,14 @@ class BaseCache : public MemObject
             DPRINTF(Cache, "Potential to merge writeback %s", pkt->print());
         }
 
-        writeBuffer.allocate(blk_addr, blkSize, pkt, time, order++);
+        WriteQueueEntry *wq_entry_new = writeBuffer.allocate(blk_addr, blkSize, pkt, time, order++);
+        //--------CHANGED----------
+        if(cacheName.find("l2") != std::string::npos) {
+     	   std::cout << curTick() << "\t" << pkt->getAddr() <<" -> Packet came into global wb_queue for cache " << cacheName << "\n";
+        	ptrTol3WBReqQueue->allocateL3RQ(wq_entry_new, cacheName);
+//        	ptrTol3WBReqQueue->dump();
+        }
+        //--------CHANGED----------
 
         if (writeBuffer.isFull()) {
             setBlocked((BlockedCause)MSHRQueue_WriteBuffer);

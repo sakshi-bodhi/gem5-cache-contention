@@ -138,14 +138,18 @@ BaseSetAssoc::findBlockBySetAndWay(int set, int way) const
 
 std::string
 BaseSetAssoc::print() const {
+	std::cout<<"Inside PRINT\t" << numSets << "\t" << assoc << "\n";
     std::string cache_state;
     for (unsigned i = 0; i < numSets; ++i) {
         // link in the data blocks
         for (unsigned j = 0; j < assoc; ++j) {
             BlkType *blk = sets[i].blks[j];
-            if (blk->isValid())
-                cache_state += csprintf("\tset: %d block: %d %s\n", i, j,
+            if (blk->isValid()) {
+                cache_state += csprintf("\tblk: %lld \tset: %d block: %d %s\n", blk, i, j,
                         blk->print());
+//                cache_state += csprintf("\tset: %d block: %d %s\n", i, j,
+//                        blk->print());
+            }
         }
     }
     if (cache_state.empty())

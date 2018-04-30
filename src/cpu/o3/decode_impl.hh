@@ -51,6 +51,7 @@
 #include "debug/Activity.hh"
 #include "debug/Decode.hh"
 #include "debug/O3PipeView.hh"
+#include "debug/CpuStatus.hh"
 #include "params/DerivO3CPU.hh"
 #include "sim/full_system.hh"
 
@@ -472,6 +473,28 @@ DefaultDecode<Impl>::sortInsts()
     int insts_from_fetch = fromFetch->size;
     for (int i = 0; i < insts_from_fetch; ++i) {
         insts[fromFetch->insts[i]->threadNumber].push(fromFetch->insts[i]);
+        DynInstPtr inst = fromFetch->insts[i];
+//        if(!inst->getName().compare("mov")) {
+//        	    std::cout << "MOV inst addr: " << inst->instAddr() << "\n";
+//        	    std::cout << "MOV inst microPC: " << inst->microPC() << "\n";
+//        	    std::cout << "MOV inst type: " << inst->getName() << "\n";
+//        	    std::cout <<  "MOV Instruction is: %s\n" << inst->staticInst->disassemble(inst->pcState().instAddr()) <<"\n";
+//        	    for(int j = 0; j < inst->numSrcRegs(); j++) {
+//        	    	std::cout << "MOV src register" << inst->srcRegIdx(j) << "\t";
+//        	    }
+////        	    inst->setSrcRegIdx(0, inst->srcRegIdx(1));
+////        	    inst->setSrcRegIdx(2, inst->srcRegIdx(1));
+////        	    std::cout << "\n";
+////        	    for(int j = 0; j < inst->numSrcRegs(); j++) {
+////        	    	std::cout << "MOV new src register" << inst->srcRegIdx(j) << "\t";
+////        	    }
+//        	    std::cout << "\n";
+//
+//        	    for(int j = 0; j < inst->numDestRegs(); j++) {
+//        	    	std::cout << "MOV dest register" << inst->destRegIdx(j) << "\t";
+//        	    }
+//        	    std::cout << "\n";
+//        }
     }
 }
 
@@ -593,10 +616,25 @@ DefaultDecode<Impl>::decode(bool &status_change, ThreadID tid)
     //     continue trying to empty skid buffer
     //     check if stall conditions have passed
 
+    if(decodeStatus[tid] == Idle) {
+        DPRINTF(CpuStatus," decode: 2: (idle): overall_stage_status: %d\n", _status);
+        recordStatus(curTick(), name(), "decode", 2, _status, "none");
+    }
+    else if (decodeStatus[tid] == Blocked) {
+    	DPRINTF(CpuStatus," decode: 1: (blocked): overall_stage_status: %d\n", _status);
+    	recordStatus(curTick(), name(), "decode", 1, _status, "none");
+    }
+    else {
+    	DPRINTF(CpuStatus," decode: 0: (running): overall_stage_status: %d\n", _status);
+    	recordStatus(curTick(), name(), "decode", 0, _status, "none");
+    }
+
     if (decodeStatus[tid] == Blocked) {
         ++decodeBlockedCycles;
+//        DPRINTF(CpuStatus," Decode is blocked (blocked)\n");
     } else if (decodeStatus[tid] == Squashing) {
         ++decodeSquashCycles;
+//        std::cout << curTick() << "\t Decode is blocked (squashing)\n";
     }
 
     // Decode should try to decode as many instructions as its bandwidth
@@ -641,6 +679,7 @@ DefaultDecode<Impl>::decodeInsts(ThreadID tid)
                 " early.\n",tid);
         // Should I change the status to idle?
         ++decodeIdleCycles;
+//        DPRINTF(CpuStatus," Fetch is blocked (idle)\n");
         return;
     } else if (decodeStatus[tid] == Unblocking) {
         DPRINTF(Decode, "[tid:%u] Unblocking, removing insts from skid "

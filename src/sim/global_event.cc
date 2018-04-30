@@ -74,6 +74,11 @@ void BaseGlobalEvent::schedule(Tick when)
 
     globalQMutex.lock();
 
+//	std::cout << curTick() << "\tschedule - Base Global Event\t" << when << "\n";
+//
+//        		std::cout << "Num of Main queues=" << numMainEventQueues << "\n";
+
+
     for (int i = 0; i < numMainEventQueues; ++i) {
         mainEventQueue[i]->schedule(barrierEvent[i], when, true);
     }
@@ -154,6 +159,8 @@ GlobalSyncEvent::BarrierEvent::process()
 void
 GlobalSyncEvent::process()
 {
+//	std::cout << "\tGlovbal event - process()\n";
+//	std::cout << curTick() << "\t repeat " << repeat << "\n";
     if (repeat) {
         schedule(curTick() + repeat);
     }

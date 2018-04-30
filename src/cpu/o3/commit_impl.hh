@@ -64,6 +64,7 @@
 #include "debug/Drain.hh"
 #include "debug/ExecFaulting.hh"
 #include "debug/O3PipeView.hh"
+#include "debug/CpuStatus.hh"
 #include "params/DerivO3CPU.hh"
 #include "sim/faults.hh"
 #include "sim/full_system.hh"
@@ -648,6 +649,17 @@ DefaultCommit<Impl>::squashAfter(ThreadID tid, DynInstPtr &head_inst)
     squashAfterInst[tid] = head_inst;
 }
 
+std::vector<std::string> split(const string &s, char delim) {
+    stringstream ss(s);
+    string item;
+    vector<string> tokens;
+    while (getline(ss, item, delim)) {
+        tokens.push_back(item);
+    }
+    return tokens;
+}
+
+
 template <class Impl>
 void
 DefaultCommit<Impl>::tick()
@@ -663,11 +675,23 @@ DefaultCommit<Impl>::tick()
 
     // Check if any of the threads are done squashing.  Change the
     // status if they are done.
+
     while (threads != end) {
         ThreadID tid = *threads++;
 
         // Clear the bit saying if the thread has committed stores
         // this cycle.
+
+        if(commitStatus[tid] == Idle) {
+            DPRINTF(CpuStatus," commit: 2: (idle): overall_stage_status: %d\n", _status);
+        	recordStatus(curTick(), name(), "commit", 2, _status, "none");
+    //        recordStatus(name(), "rename", 2, curTick());
+        }
+        else {
+        	DPRINTF(CpuStatus," commit: 0: (running-not idle): overall_stage_status: %d\n", _status);
+        	recordStatus(curTick(), name(), "commit", 0, _status, "none");
+    //    	recordStatus(name(), "rename", 0, curTick());
+        }
         committedStores[tid] = false;
 
         if (commitStatus[tid] == ROBSquashing) {
@@ -703,6 +727,15 @@ DefaultCommit<Impl>::tick()
             DPRINTF(Commit,"[tid:%i]: Instruction [sn:%lli] PC %s is head of"
                     " ROB and ready to commit\n",
                     tid, inst->seqNum, inst->pcState());
+        	DPRINTF(CpuStatus," commit: 0: (running): overall_stage_status: %d\t%s\t[sn:%lli]\n", _status, inst->staticInst->disassemble(inst->pcState().instAddr()), inst->seqNum);
+        	recordStatus(curTick(), name(), "commit", 0, _status, inst->staticInst->disassemble(inst->pcState().instAddr()) +" ("+std::to_string(inst->seqNum) + ")");
+//        	std::vector<std::string> str =  split(inst->staticInst->disassemble(inst->pcState().instAddr()), ' ');
+////        	for (unsigned i=0; i<str.size(); i++)
+////        		std::cout << "PRINT string inst is " << str.at(i) << "\n";
+//        	std::string st = str.at(2) + str.at(3) + str.at(4);
+//        	recordStatus(curTick(), name(), "commit", 0, _status, st);
+////        	std::cout << "PRINT string inst is " << str.at(2) << " " << str.at(1) << "\n";
+////        	recordStatus(curTick(), name(), "commit", 0, _status, inst->staticInst->disassemble(inst->pcState().instAddr()));
 
         } else if (!rob->isEmpty(tid)) {
             DynInstPtr inst = rob->readHeadInst(tid);
@@ -712,6 +745,21 @@ DefaultCommit<Impl>::tick()
             DPRINTF(Commit,"[tid:%i]: Can't commit, Instruction [sn:%lli] PC "
                     "%s is head of ROB and not ready\n",
                     tid, inst->seqNum, inst->pcState());
+            if (inst->isLoad()) {
+            	DPRINTF(CpuStatus," commit: 1: (load inst-rob blocked): overall_stage_status: %d\t%s\t[sn:%lli]\n", _status, inst->staticInst->disassemble(inst->pcState().instAddr()), inst->seqNum);
+            	recordStatus(curTick(), name(), "commit", 1, _status, inst->staticInst->disassemble(inst->pcState().instAddr()) +" ("+std::to_string(inst->seqNum) + ")");
+//            	DPRINTF(CpuStatus,"ROB head is blocked (load inst) \t [sn:%lli] \t %s\n", inst->seqNum, inst->staticInst->disassemble(inst->pcState().instAddr()));
+            }
+            else if (inst->isStore()) {
+            	DPRINTF(CpuStatus," commit: 1: (store inst-rob blocked): overall_stage_status: %d\t%s\t[sn:%lli]\n", _status, inst->staticInst->disassemble(inst->pcState().instAddr()), inst->seqNum);
+            	recordStatus(curTick(), name(), "commit", 1, _status, inst->staticInst->disassemble(inst->pcState().instAddr()) +" ("+std::to_string(inst->seqNum) + ")");
+//            	DPRINTF(CpuStatus,"ROB head is blocked (store inst) \t [sn:%lli] \t %s\n", inst->seqNum, inst->staticInst->disassemble(inst->pcState().instAddr()));
+            }
+            else {
+            	DPRINTF(CpuStatus," commit: 1: (head inst-rob blocked): overall_stage_status: %d\t%s\t[sn:%lli]\n", _status, inst->staticInst->disassemble(inst->pcState().instAddr()), inst->seqNum);
+            	recordStatus(curTick(), name(), "commit", 1, _status, inst->staticInst->disassemble(inst->pcState().instAddr()) +" ("+std::to_string(inst->seqNum) + ")");
+//            	DPRINTF(CpuStatus,"ROB head is blocked \t [sn:%lli] \t %s\n", inst->seqNum, inst->staticInst->disassemble(inst->pcState().instAddr()));
+            }
         }
 
         DPRINTF(Commit, "[tid:%i]: ROB has %d insts & %d free entries.\n",
@@ -1229,6 +1277,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
 
         DPRINTF(Commit, "Committing instruction with fault [sn:%lli]\n",
             head_inst->seqNum);
+
         if (head_inst->traceData) {
             if (DTRACE(ExecFaulting)) {
                 head_inst->traceData->setFetchSeq(head_inst->seqNum);
@@ -1264,6 +1313,8 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
     }
     DPRINTF(Commit, "Committing instruction with [sn:%lli] PC %s\n",
             head_inst->seqNum, head_inst->pcState());
+
+
     if (head_inst->traceData) {
         head_inst->traceData->setFetchSeq(head_inst->seqNum);
         head_inst->traceData->setCPSeq(thread[tid]->numOp);
@@ -1321,6 +1372,8 @@ DefaultCommit<Impl>::getInsts()
 
             DPRINTF(Commit, "Inserting PC %s [sn:%i] [tid:%i] into ROB.\n",
                     inst->pcState(), inst->seqNum, tid);
+
+//            std::cout << "Instruction added: " << inst << "\n" ;
 
             rob->insertInst(inst);
 

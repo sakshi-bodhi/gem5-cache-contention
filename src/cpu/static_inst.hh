@@ -191,6 +191,9 @@ class StaticInst : public RefCounted, public StaticInstFlags
     /// Only the entries from 0 through numSrcRegs()-1 are valid.
     RegIndex srcRegIdx(int i)  const { return _srcRegIdx[i]; }
 
+    //--CHANGED---
+//    void setSrcRegIdx(int i, RegIndex j)  const { _srcRegIdx[i] = j; }
+
     /// Pointer to a statically allocated "null" instruction object.
     /// Used to give eaCompInst() and memAccInst() something to return
     /// when called on non-memory instructions.

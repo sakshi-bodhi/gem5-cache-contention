@@ -72,6 +72,8 @@ Source('dvfs_handler.cc')
 Source('clocked_object.cc')
 Source('mathexpr.cc')
 
+Source('mypriority.cc')
+
 if env['TARGET_ISA'] != 'null':
     SimObject('InstTracer.py')
     SimObject('Process.py')
@@ -108,5 +110,9 @@ DebugFlag('WorkItems')
 DebugFlag('ClockDomain')
 DebugFlag('VoltageDomain')
 DebugFlag('DVFS')
+DebugFlag('MYSTATS')
+DebugFlag('SimStatus')
+DebugFlag('PktTrace')
+
 
 CompoundFlag('SyscallAll', [ 'SyscallBase', 'SyscallVerbose'])

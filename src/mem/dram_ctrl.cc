@@ -51,6 +51,7 @@
 #include "debug/DRAM.hh"
 #include "debug/DRAMPower.hh"
 #include "debug/DRAMState.hh"
+#include "debug/DelayPath.hh"
 #include "debug/Drain.hh"
 #include "sim/system.hh"
 
@@ -417,6 +418,25 @@ DRAMCtrl::decodeAddr(PacketPtr pkt, Addr dramPktAddr, unsigned size,
                           size, ranks[rank]->banks[bank], *ranks[rank]);
 }
 
+
+void DRAMCtrl::printRRWQ() {
+	std::cout << "curTick() " << curTick() << "\n";
+    std::cout << "===READ QUEUE Size===" << readQueue.size() << "\n";
+    for (auto i = readQueue.begin() ;  i != readQueue.end() ; ++i) {
+        std::cout << (*i)->pkt->req->rid << "\n";
+    }
+
+    std::cout << "===RESP QUEUE Size===" << respQueue.size() << "\n";
+    for (auto i = respQueue.begin() ;  i != respQueue.end() ; ++i) {
+    	std::cout << (*i)->pkt->req->rid << "\n";
+    }
+
+    std::cout << "===WRITE QUEUE Size===" << writeQueue.size() << "\n";
+    for (auto i = writeQueue.begin() ;  i != writeQueue.end() ; ++i) {
+    	std::cout << (*i)->pkt->req->rid << "\n";
+    }
+}
+
 void
 DRAMCtrl::addToReadQueue(PacketPtr pkt, unsigned int pktCount)
 {
@@ -467,6 +487,8 @@ DRAMCtrl::addToReadQueue(PacketPtr pkt, unsigned int pktCount)
         // push it onto the read queue
         if (!foundInWrQ) {
 
+//        	std::cout << "In memory ctrl \t 2\n";
+
             // Make the burst helper for split packets
             if (pktCount > 1 && burst_helper == NULL) {
                 DPRINTF(DRAM, "Read to addr %lld translates to %d "
@@ -475,6 +497,7 @@ DRAMCtrl::addToReadQueue(PacketPtr pkt, unsigned int pktCount)
             }
 
             DRAMPacket* dram_pkt = decodeAddr(pkt, addr, size, true);
+//            std::cout << "In memory ctrl \t 3\n";
             dram_pkt->burstHelper = burst_helper;
 
             assert(!readQueueFull(1));
@@ -482,7 +505,12 @@ DRAMCtrl::addToReadQueue(PacketPtr pkt, unsigned int pktCount)
 
             DPRINTF(DRAM, "Adding to read queue\n");
 
+            addToDelayPath(dram_pkt->pkt->req->rid, dram_pkt->pkt->getAddr(), curTick(), name()+".addingToReadQ", "Req", false, 2);
+
             readQueue.push_back(dram_pkt);
+
+//            std::cout << "Adding to read queue\n";
+//            printRRWQ();
 
             // increment read entries of the rank
             ++dram_pkt->rankRef.readEntries;
@@ -497,6 +525,7 @@ DRAMCtrl::addToReadQueue(PacketPtr pkt, unsigned int pktCount)
 
     // If all packets are serviced by write queue, we send the repsonse back
     if (pktsServicedByWrQ == pktCount) {
+//    	std::cout << "In memory ctrl \t 4\n";
         accessAndRespond(pkt, frontendLatency);
         return;
     }
@@ -509,6 +538,17 @@ DRAMCtrl::addToReadQueue(PacketPtr pkt, unsigned int pktCount)
     // queue, do so now
     if (!nextReqEvent.scheduled()) {
         DPRINTF(DRAM, "Request scheduled immediately\n");
+//        std::cout << "In memory ctrl \t 5\n";
+        //    -----CHANGED----
+           if(pkt->getAddr() == 960){
+//           	std::cout << "In memory ctrl\n";
+           	std::cout << curTick() << "\t" << pkt->getAddr() << "\t" << name() << "\n";
+           	std::cout << "\t\t\tpkt_headerDelay " << pkt->headerDelay << "\tpayLoadDelay " << pkt->payloadDelay << "\n";
+           	std::cout << "\t\tnextReqEvent " << nextReqEvent.name() << "\t" << nextReqEvent.when() << "\n";
+//           	std::cout << "\t\tbacktendLatency " << backendLatency << "\n";
+           }
+           //    -----CHANGED----
+//           std::cout << "scheduling nextReqEvent now \n";
         schedule(nextReqEvent, curTick());
     }
 }
@@ -544,7 +584,13 @@ DRAMCtrl::addToWriteQueue(PacketPtr pkt, unsigned int pktCount)
 
             DPRINTF(DRAM, "Adding to write queue\n");
 
+            addToDelayPath(dram_pkt->pkt->req->rid, dram_pkt->pkt->getAddr(), curTick(), name()+".addingToWriteQ", "Req", false, 2);
+
             writeQueue.push_back(dram_pkt);
+
+//            std::cout << "Adding to write queue\n";
+//            printRRWQ();
+
             isInWriteQueue.insert(burstAlign(addr));
             assert(writeQueue.size() == isInWriteQueue.size());
 
@@ -610,8 +656,25 @@ DRAMCtrl::recvTimingReq(PacketPtr pkt)
              "Should only see read and writes at memory controller\n");
 
     // Calc avg gap between requests
+
+    //    -----CHANGED----
+    if(pkt->getAddr() == 960){
+    	std::cout << "In memory ctrl\n";
+    	std::cout << curTick() << "\t" << pkt->getAddr() << "\t" << name() << "\n";
+    	std::cout << "\t\t\tpkt_headerDelay " << pkt->headerDelay << "\tpayLoadDelay " << pkt->payloadDelay << "\n";
+    	std::cout << "\t\tfrontendLatency " << frontendLatency;
+    	std::cout << "\t\tbacktendLatency " << backendLatency << "\n";
+    }
+    //    -----CHANGED----
+
+
     if (prevArrival != 0) {
         totGap += curTick() - prevArrival;
+        //    -----CHANGED----
+        if(pkt->getAddr() == 960){
+           	std::cout << "curTick() " << curTick() << "\tprevArrival " << prevArrival << "\n";
+        }
+           //    -----CHANGED----
     }
     prevArrival = curTick();
 
@@ -625,7 +688,8 @@ DRAMCtrl::recvTimingReq(PacketPtr pkt)
     unsigned int dram_pkt_count = divCeil(offset + size, burstSize);
 
     // check local buffers and do not accept if full
-    if (pkt->isRead()) {
+
+      if (pkt->isRead()) {
         assert(size != 0);
         if (readQueueFull(dram_pkt_count)) {
             DPRINTF(DRAM, "Read queue full, not accepting\n");
@@ -634,6 +698,7 @@ DRAMCtrl::recvTimingReq(PacketPtr pkt)
             numRdRetry++;
             return false;
         } else {
+//        	std::cout << "In memory ctrl \t 1\n";
             addToReadQueue(pkt, dram_pkt_count);
             readReqs++;
             bytesReadSys += size;
@@ -653,6 +718,7 @@ DRAMCtrl::recvTimingReq(PacketPtr pkt)
             bytesWrittenSys += size;
         }
     }
+//      std::cout << "In memory ctrl \t return\n";
 
     return true;
 }
@@ -664,6 +730,8 @@ DRAMCtrl::processRespondEvent()
             "processRespondEvent(): Some req has reached its readyTime\n");
 
     DRAMPacket* dram_pkt = respQueue.front();
+
+    addToDelayPath(dram_pkt->pkt->req->rid, dram_pkt->pkt->getAddr(), curTick(), name()+".DRAM_Access", "Req", false, 2);
 
     // if a read has reached its ready-time, decrement the number of reads
     // At this point the packet has been handled and there is a possibility
@@ -723,6 +791,9 @@ DRAMCtrl::processRespondEvent()
         // it is not a split packet
         accessAndRespond(dram_pkt->pkt, frontendLatency + backendLatency);
     }
+
+//    std::cout << "Removing from resp queue\n";
+//    printRRWQ();
 
     delete respQueue.front();
     respQueue.pop_front();
@@ -906,12 +977,25 @@ DRAMCtrl::accessAndRespond(PacketPtr pkt, Tick static_latency)
         // number of data beats.
         Tick response_time = curTick() + static_latency + pkt->headerDelay +
                              pkt->payloadDelay;
+
+        //    -----CHANGED----
+        if(pkt->getAddr() == 960){
+        	std::cout << curTick() << "\t" << pkt->getAddr() << "\tDRAMCtrl::accessAndResond()\t" << name() << "\tresponse_time " << response_time << "\n";
+        	std::cout << "\t\tstatic_latency " << static_latency << "\theaderDelay " <<pkt->headerDelay << "\tpayloadDelay " << pkt->payloadDelay << "\n";
+        }
+        //    -----CHANGED----
+
+
         // Here we reset the timing of the packet before sending it out.
         pkt->headerDelay = pkt->payloadDelay = 0;
 
         // queue the packet in the response queue to be sent out after
         // the static latency has passed
+
         port.schedTimingResp(pkt, response_time, true);
+
+        addToDelayPath(pkt->req->rid, pkt->getAddr(), response_time, name()+".DRAMRespTime", "Resp", false, 2);
+
     } else {
         // @todo the packet is going to be deleted, and the DRAMPacket
         // is still having a pointer to it
@@ -1263,6 +1347,8 @@ DRAMCtrl::doDRAMAccess(DRAMPacket* dram_pkt)
     // we will wake up sooner than we have to.
     nextReqTime = busBusyUntil - (tRP + tRCD + tCL);
 
+//    std::cout<< "curTick() " << curTick() << "\n";
+
     // Update the stats and schedule the next request
     if (dram_pkt->isRead) {
         ++readsThisTime;
@@ -1406,6 +1492,8 @@ DRAMCtrl::processNextReqEvent()
                 return;
 
             DRAMPacket* dram_pkt = readQueue.front();
+//            addToDelayPath(dram_pkt->pkt->req->rid, dram_pkt->pkt->getAddr(), curTick(), name()+".removingFromReadQ", "Req", false, 2);
+
             assert(dram_pkt->rankRef.isAvailable());
 
             // here we get a bit creative and shift the bus busy time not
@@ -1421,6 +1509,9 @@ DRAMCtrl::processNextReqEvent()
 
             // At this point we're done dealing with the request
             readQueue.pop_front();
+
+//            std::cout << "Removing from read queue\n";
+//            printRRWQ();
 
             // Every respQueue which will generate an event, increment count
             ++dram_pkt->rankRef.outstandingEvents;
@@ -1440,6 +1531,14 @@ DRAMCtrl::processNextReqEvent()
             }
 
             respQueue.push_back(dram_pkt);
+
+//            std::cout << "Adding to resp queue\n";
+//               printRRWQ();
+
+//            addToDelayPath(dram_pkt->pkt->req->rid, dram_pkt->pkt->getAddr(), curTick(), name()+".addingToRespQ", "RespQ", false, 2);
+
+        	if(dram_pkt->pkt->req != 0x0)
+        		addToDelayPath(dram_pkt->pkt->req->rid, dram_pkt->addr, curTick(), name()+".addingToRespQ", "RespQ", false, 2);
 
             // we have so many writes that we have to transition
             if (writeQueue.size() > writeHighThreshold) {
@@ -1483,9 +1582,14 @@ DRAMCtrl::processNextReqEvent()
             busBusyUntil += tRTW;
         }
 
+//        addToDelayPath(dram_pkt->pkt->req->rid, dram_pkt->pkt->getAddr(), curTick(), name()+".removingFromWriteQ", "Req", false, 2);
+
         doDRAMAccess(dram_pkt);
 
         writeQueue.pop_front();
+
+//        std::cout << "Removing from write queue\n";
+//        printRRWQ();
 
         // removed write from queue, decrement count
         --dram_pkt->rankRef.writeEntries;
@@ -1497,7 +1601,14 @@ DRAMCtrl::processNextReqEvent()
         // the time that writes are outstanding and bus is active
         // to holdoff power-down entry events
         if (!dram_pkt->rankRef.writeDoneEvent.scheduled()) {
-            schedule(dram_pkt->rankRef.writeDoneEvent, dram_pkt->readyTime);
+
+//        	addToDelayPath(dram_pkt->pkt->req->rid, dram_pkt->pkt->getAddr(), dram_pkt->readyTime, name()+".WriteDoneEvent", "RespQ", false, 2);
+//        	if(curTick() == 598635000)
+//        		std::cout << "name " << name() << "\tdrampkt addr " << dram_pkt->addr << "\n";
+        	if(dram_pkt->pkt->req != 0x0)
+        		addToDelayPath(dram_pkt->pkt->req->rid, dram_pkt->addr, dram_pkt->readyTime, name()+".WriteDoneEvent", "RespQ", false, 2);
+
+        	schedule(dram_pkt->rankRef.writeDoneEvent, dram_pkt->readyTime);
             // New event, increment count
             ++dram_pkt->rankRef.outstandingEvents;
 

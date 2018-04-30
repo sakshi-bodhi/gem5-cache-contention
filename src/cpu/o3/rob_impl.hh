@@ -49,6 +49,7 @@
 #include "cpu/o3/rob.hh"
 #include "debug/Fetch.hh"
 #include "debug/ROB.hh"
+#include "debug/MYROB.hh"
 #include "params/DerivO3CPU.hh"
 
 using namespace std;
@@ -66,6 +67,8 @@ ROB<Impl>::ROB(O3CPU *_cpu, DerivO3CPUParams *params)
     //Convert string to lowercase
     std::transform(policy.begin(), policy.end(), policy.begin(),
                    (int(*)(int)) tolower);
+
+//    std::cout << "Max inst in ROB " << numEntries << "\n";
 
     //Figure out rob policy
     if (policy == "dynamic") {
@@ -216,12 +219,66 @@ ROB<Impl>::insertInst(DynInstPtr &inst)
     robWrites++;
 
     DPRINTF(ROB, "Adding inst PC %s to the ROB.\n", inst->pcState());
+    DPRINTF(MYROB, "Inst added to ROB [sn:%lli]\t%s\n" , inst->seqNum, inst->staticInst->disassemble(inst->pcState().instAddr()));
 
     assert(numInstsInROB != numEntries);
 
     ThreadID tid = inst->threadNumber;
 
     instList[tid].push_back(inst);
+
+
+//    std::cout << "MOV Thread id " << tid << " has " << numInstsInROB+1 << " entries\n";
+//    std::cout << "MOV Instruction added: " << inst->seqNum << "\n" ;
+//    std::cout << "MOV ------Instruction list in ROB------- " << "\n" ;
+
+    int numLoads = 0, loads_issued = 0, loads_ready = 0, inst_ready = 0, j = 1;
+//    int num = 0;
+//
+//    ListIt inst_list_it = instList.begin();
+//
+//    cprintf("Dumping Instruction List\n");
+//
+//    while (inst_list_it != instList.end()) {
+//        cprintf("Instruction:%i\nPC:%#x\n[tid:%i]\n[sn:%lli]\nIssued:%i\n"
+//                "Squashed:%i\n\n",
+//                num, (*inst_list_it)->instAddr(), (*inst_list_it)->threadNumber,
+//                (*inst_list_it)->seqNum, (*inst_list_it)->isIssued(),
+//                (*inst_list_it)->isSquashed());
+//        inst_list_it++;
+//        ++num;
+//    }
+    for(InstIt head_thread = instList[tid].begin(); head_thread != instList[tid].end(); head_thread++) {
+    	DynInstPtr inst = (*head_thread);
+//    	std::cout << "inst " << j << " :- " << inst->seqNum << "\t " << inst->staticInst->disassemble(inst->pcState().instAddr()) << "\t is ready to issue " << inst->readyToIssue() << "\t is issued? " << inst->isIssued() << "\n";
+    	if(inst->readyToIssue()){
+    		inst_ready++;
+    	}
+    	if(inst->isLoad()) {
+    		numLoads++;
+    		if(inst->isIssued()){
+    			loads_issued++;
+    		}
+    		if(inst->readyToIssue()){
+    			loads_ready++;
+    		}
+//    		std::cout << " LOAD inst " << j << " :- " << inst->seqNum << "\t " << inst->staticInst->disassemble(inst->pcState().instAddr()) << "\t is issued? " << inst->isIssued() << "\n";
+    	}
+    	j++;
+    }
+//    std::cout << "MOV total number of loads present in ROB " << numLoads << "\n";
+//    std::cout << "MOV total number of loads issued " << loads_issued << "\n";
+//    std::cout << "MOV total number of loads ready to issue " << loads_ready << "\n";
+//    std::cout << "MOV total number of inst ready to issue " << inst_ready << "\n";
+//    std::cout << "\n-----ROB-----\n";
+//    std::cout << curTick() << "\tROB size (instList) : " << instList[tid].size() << "\n";
+//    std::cout << "inst addr: " << inst->instAddr() << "\n";
+//    std::cout << "inst microPC: " << inst->microPC() << "\n";
+//    std::cout << "inst type: " << inst->getName() << "\n";
+//    if(inst->isLoad()) {
+//    	std::cout << curTick() << " load instruction in ROB \n";
+//    }
+
 
     //Set Up head iterator if this is the 1st instruction in the ROB
     if (numInstsInROB == 0) {
@@ -357,6 +414,9 @@ ROB<Impl>::doSquash(ThreadID tid)
                 (*squashIt[tid])->threadNumber,
                 (*squashIt[tid])->pcState(),
                 (*squashIt[tid])->seqNum);
+
+
+//        std::cout << curTick() << "\t ---Squashing ROB--- Seq no.: " << (*squashIt[tid])->seqNum << "\n";
 
         // Mark the instruction as squashed, and ready to commit so that
         // it can drain out of the pipeline.

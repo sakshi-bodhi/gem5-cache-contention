@@ -691,10 +691,10 @@ class FullO3CPU : public BaseO3CPU
     }
 
     /** Used by the fetch unit to get a hold of the instruction port. */
-    MasterPort &getInstPort() override { return icachePort; }
+    MasterPort &getInstPort() override { 	return icachePort; }
 
     /** Get the dcache port (used to find block size for translations). */
-    MasterPort &getDataPort() override { return dcachePort; }
+    MasterPort &getDataPort() override { 	return dcachePort; }
 
     /** Stat for total number of times the CPU is descheduled. */
     Stats::Scalar timesIdled;

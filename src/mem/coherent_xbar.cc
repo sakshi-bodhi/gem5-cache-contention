@@ -53,6 +53,7 @@
 #include "base/trace.hh"
 #include "debug/AddrRanges.hh"
 #include "debug/CoherentXBar.hh"
+#include "debug/DelayPath.hh"
 #include "sim/system.hh"
 
 CoherentXBar::CoherentXBar(const CoherentXBarParams *p)
@@ -71,6 +72,9 @@ CoherentXBar::CoherentXBar(const CoherentXBarParams *p)
                                          csprintf(".reqLayer%d", i)));
         snoopLayers.push_back(new SnoopRespLayer(*bp, *this,
                                                  csprintf(".snoopLayer%d", i)));
+
+        std::cout << "---CoherentXBar---   i -->" << i << "\tmasterPort name " << portName << "\t MasterPort" << bp->getId() << "\n";
+
     }
 
     // see if we have a default slave device connected and if so add
@@ -96,6 +100,7 @@ CoherentXBar::CoherentXBar(const CoherentXBarParams *p)
         respLayers.push_back(new RespLayer(*bp, *this,
                                            csprintf(".respLayer%d", i)));
         snoopRespPorts.push_back(new SnoopRespPort(*bp, *this));
+        std::cout << "---CoherentXBar---   i -->" << i << "\tslavePort name " << portName << "\t QueuedSlavePort" << bp->getId() << "\n";
     }
 
     clearPortCache();
@@ -144,6 +149,19 @@ CoherentXBar::recvTimingReq(PacketPtr pkt, PortID slave_port_id)
     // determine the source port based on the id
     SlavePort *src_port = slavePorts[slave_port_id];
 
+    std::cout << curTick() << "\tTrace " << name() << " recvTimingReq(coherent_xbar.cc):\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
+
+      	//std::cout << "Master id " << pkt->req->masterId() << "\tname " << system->getMasterName(pkt->req->masterId()) << "\n";
+
+    //    -----CHANGED----
+        if(pkt->getAddr() == 960){
+        	std::cout << curTick() << "\t" << pkt->getAddr() << "\tCoherentXBar::recvTimingReq()\t" << name() << "\n";
+        	std::cout << "\t\t\tpkt_headerDelay " << pkt->headerDelay << "\tpayLoadDelay " << pkt->payloadDelay << "\n";
+        }
+        //    -----CHANGED----
+
+//    	std::cout << curTick() << "\tRequest\t" << name() << "\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->masterId() << "\n";
+
     // remember if the packet is an express snoop
     bool is_express_snoop = pkt->isExpressSnoop();
     bool cache_responding = pkt->cacheResponding();
@@ -159,6 +177,14 @@ CoherentXBar::recvTimingReq(PacketPtr pkt, PortID slave_port_id)
     if (!is_express_snoop && !reqLayers[master_port_id]->tryTiming(src_port)) {
         DPRINTF(CoherentXBar, "%s: src %s packet %s BUSY\n", __func__,
                 src_port->name(), pkt->print());
+
+        std::cout << "TEST_REQ\t" << curTick() << "\tRequest\t" << name() << "\t" << pkt->getAddr() << "\t" << pkt->req << "\t" << pkt->req->rid << "\t" << pkt->req->masterId() << "\n";
+
+        //-----CHANGED----
+//          std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tRequested but didn't get" << "\n";
+//          addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "Req", false);
+          //-----CHANGED----
+
         return false;
     }
 
@@ -180,7 +206,16 @@ CoherentXBar::recvTimingReq(PacketPtr pkt, PortID slave_port_id)
     calcPacketTiming(pkt, xbar_delay);
 
     // determine how long to be crossbar layer is busy
-    Tick packetFinishTime = clockEdge(Cycles(1)) + pkt->payloadDelay;
+//    Tick packetFinishTime = clockEdge(Cycles(1)) + pkt->payloadDelay;
+    //--------CHANGED------
+    Tick packetFinishTime;
+    if(name().find("l3") != std::string::npos)
+    	packetFinishTime = clockEdge(Cycles(31)) + pkt->payloadDelay;
+    else if(name().find("l2") != std::string::npos)
+        	packetFinishTime = clockEdge(Cycles(11)) + pkt->payloadDelay;
+    else
+        packetFinishTime = clockEdge(Cycles(1)) + pkt->payloadDelay;
+    //--------CHANGED------
 
     if (!system->bypassCaches()) {
         assert(pkt->snoopDelay == 0);
@@ -270,6 +305,14 @@ CoherentXBar::recvTimingReq(PacketPtr pkt, PortID slave_port_id)
 
     // check if we were successful in sending the packet onwards
     if (!success)  {
+
+//    	std::cout << " TEST_REQ\t" << curTick() << "\tRequest didn't accept\t" << name() << "\t" << pkt->getAddr() << "\t" << pkt->req << "\t" << pkt->req->rid << "\t" << pkt->req->masterId() << "\n";
+
+        //-----CHANGED----
+//          std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tRequested but didn't get" << "\n";
+//          addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "Req", false);
+          //-----CHANGED----
+
         // express snoops should never be forced to retry
         assert(!is_express_snoop);
 
@@ -283,6 +326,9 @@ CoherentXBar::recvTimingReq(PacketPtr pkt, PortID slave_port_id)
         reqLayers[master_port_id]->failedTiming(src_port,
                                                 clockEdge(Cycles(1)));
     } else {
+
+//    	std::cout << " TEST_REQ\t"  << curTick() << "\tRequest accepted\t" << name() << "\t" << pkt->getAddr() << "\t" << pkt->req << "\t" << pkt->req->rid << "\t" << pkt->req->masterId() << "\n";
+
         // express snoops currently bypass the crossbar state entirely
         if (!is_express_snoop) {
             // if this particular request will generate a snoop
@@ -303,10 +349,22 @@ CoherentXBar::recvTimingReq(PacketPtr pkt, PortID slave_port_id)
                 assert(routeTo.find(pkt->req) == routeTo.end());
                 routeTo[pkt->req] = slave_port_id;
 
+//            	std::cout << "TEST_REQ\t" << "routeTo size- " << routeTo.size() << "\n";
+//            	typedef std::unordered_map<RequestPtr, PortID>::const_iterator MapIterator;
+//            	for (MapIterator iter = routeTo.begin(); iter != routeTo.end(); iter++)
+//            	{
+//            	    std::cout << "TEST_REQ\t" << "Request ptr: " << iter->first << "  from port id " << iter->second << "\n";
+//            	}
+
                 panic_if(routeTo.size() > 512,
                          "Routing table exceeds 512 packets\n");
             }
 
+
+//            std::cout<< "Coherent_xbar::reqLayer[master_port_id]: " << master_port_id << "\t" << packetFinishTime << "\t" << name() << "\n";
+
+//            std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tRequested and got" << "\n";
+            addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "Req", false, 2);
             // update the layer state and schedule an idle event
             reqLayers[master_port_id]->succeededTiming(packetFinishTime);
         }
@@ -343,6 +401,12 @@ CoherentXBar::recvTimingReq(PacketPtr pkt, PortID slave_port_id)
         slavePorts[slave_port_id]->schedTimingResp(pkt, response_time);
     }
 
+    //-----CHANGED----
+//      std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tRequested but didn't get" << "\n";
+//      addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "Req", false);
+      //-----CHANGED----
+
+
     return success;
 }
 
@@ -352,20 +416,55 @@ CoherentXBar::recvTimingResp(PacketPtr pkt, PortID master_port_id)
     // determine the source port based on the id
     MasterPort *src_port = masterPorts[master_port_id];
 
+    std::cout << curTick() << "\tTrace " << name() << " recvTimingResp(coherent_xbar.cc):\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
+
+    std::cout << "TEST_RESP\t" << curTick() << "\tResponse\t" << name() << "\t" << pkt->getAddr() << "\t" << pkt->req << "\t" << pkt->req->rid << "\t" << pkt->req->masterId() << "\n";
+    //    -----CHANGED----
+           if(pkt->getAddr() == 960){
+           	std::cout  << curTick() << "\t" << pkt->getAddr() << "\tCoherentXBar::recvTimingResp()\t" << name() << "\n";
+           	std::cout << "\t\t\tpkt_headerDelay " << pkt->headerDelay << "\tpayLoadDelay " << pkt->payloadDelay << "\n";
+           }
+           //    -----CHANGED----
+
     // determine the destination
     const auto route_lookup = routeTo.find(pkt->req);
+//    std::cout << "route_lookup " << route_lookup->first	 << "\t" << route_lookup->second << "\n";
     assert(route_lookup != routeTo.end());
     const PortID slave_port_id = route_lookup->second;
     assert(slave_port_id != InvalidPortID);
     assert(slave_port_id < respLayers.size());
+
+
+	std::cout << "TEST_RESP\t" << "routeTo size- " << routeTo.size() << "\n";
+	typedef std::unordered_map<RequestPtr, PortID>::const_iterator MapIterator;
+	for (MapIterator iter = routeTo.begin(); iter != routeTo.end(); iter++)
+	{
+	    std::cout << "TEST_RESP\t" << "Request ptr: " << iter->first << "  from port id " << iter->second << "\n";
+	}
+
 
     // test if the crossbar should be considered occupied for the
     // current port
     if (!respLayers[slave_port_id]->tryTiming(src_port)) {
         DPRINTF(CoherentXBar, "%s: src %s packet %s BUSY\n", __func__,
                 src_port->name(), pkt->print());
+
+        std::cout << "TEST_RESP\t" << curTick() << "\tResponse has to wait\t" << name() << "\t" << pkt->getAddr() << "\t" << pkt->req << "\t" << pkt->req->rid << "\t" << pkt->req->masterId() << "\n";
+        std::cout << "TEST_RESP\t" << "RespLayer slavePort id " << slave_port_id << "\n";
+
+//        slavePorts[slave_port_id]->respQueue->printTransmitList();
+        //-----CHANGED----
+//          std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tRequested to send response but didn't get" << "\n";
+//          addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "Req", false);
+          //-----CHANGED----
+
         return false;
     }
+
+    //-----CHANGED----
+//      std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tResponse" << "\n";
+      addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "Resp", false, 2);
+      //-----CHANGED----
 
     DPRINTF(CoherentXBar, "%s: src %s packet %s\n", __func__,
             src_port->name(), pkt->print());
@@ -382,7 +481,17 @@ CoherentXBar::recvTimingResp(PacketPtr pkt, PortID master_port_id)
     calcPacketTiming(pkt, xbar_delay);
 
     // determine how long to be crossbar layer is busy
-    Tick packetFinishTime = clockEdge(Cycles(1)) + pkt->payloadDelay;
+//    Tick packetFinishTime = clockEdge(Cycles(1)) + pkt->payloadDelay;
+
+    //--------CHANGED------
+    Tick packetFinishTime;
+    if(name().find("l3") != std::string::npos)
+    	packetFinishTime = clockEdge(Cycles(31)) + pkt->payloadDelay;
+    else if(name().find("l2") != std::string::npos)
+            	packetFinishTime = clockEdge(Cycles(11)) + pkt->payloadDelay;
+    else
+        packetFinishTime = clockEdge(Cycles(1)) + pkt->payloadDelay;
+////    //--------CHANGED------
 
     if (snoopFilter && !system->bypassCaches()) {
         // let the snoop filter inspect the response and update its state
@@ -393,10 +502,16 @@ CoherentXBar::recvTimingResp(PacketPtr pkt, PortID master_port_id)
     // any outstanding header delay
     Tick latency = pkt->headerDelay;
     pkt->headerDelay = 0;
+
+    std::cout << "TEST_RESP\t" << curTick() << "\tResponse is going\t" << name() << "\t" << pkt->getAddr() << "\t" << pkt->req << "\t" << pkt->req->rid << "\t" << pkt->req->masterId() << "\n";
+    std::cout << "TEST_RESP\t" << "RespLayer slavePort id " << slave_port_id << "\t latency added: " << latency << "\n";
+
     slavePorts[slave_port_id]->schedTimingResp(pkt, curTick() + latency);
 
     // remove the request from the routing table
     routeTo.erase(route_lookup);
+
+//    std::cout<< "Coherent_xbar::respLayer[slave_port_id]: " << slave_port_id << "\t" << packetFinishTime << "\n";
 
     respLayers[slave_port_id]->succeededTiming(packetFinishTime);
 
@@ -426,6 +541,12 @@ CoherentXBar::recvTimingSnoopReq(PacketPtr pkt, PortID master_port_id)
     // set the packet header and payload delay, for now use forward latency
     // @todo Assess the choice of latency further
     calcPacketTiming(pkt, forwardLatency * clockPeriod());
+
+    //-----CHANGED----
+//      std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tSnoopRequest" << "\n";
+      addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "SnoopReq", false, 2);
+      //-----CHANGED----
+
 
     // remember if a cache has already committed to responding so we
     // can see if it changes during the snooping
@@ -459,6 +580,13 @@ CoherentXBar::recvTimingSnoopReq(PacketPtr pkt, PortID master_port_id)
         assert(routeTo.find(pkt->req) == routeTo.end());
         routeTo[pkt->req] = master_port_id;
     }
+
+//	std::cout << "TEST_SRESP\t" << "routeTo size- " << routeTo.size() << "\n";
+//	typedef std::unordered_map<RequestPtr, PortID>::const_iterator MapIterator;
+//	for (MapIterator iter = routeTo.begin(); iter != routeTo.end(); iter++)
+//	{
+//	    std::cout << "TEST_SRESP\t" << "Request ptr: " << iter->first << "  from port id " << iter->second << "\n";
+//	}
 
     // a snoop request came from a connected slave device (one of
     // our master ports), and if it is not coming from the slave
@@ -496,6 +624,12 @@ CoherentXBar::recvTimingSnoopResp(PacketPtr pkt, PortID slave_port_id)
         if (!snoopLayers[dest_port_id]->tryTiming(src_port)) {
             DPRINTF(CoherentXBar, "%s: src %s packet %s BUSY\n", __func__,
                     src_port->name(), pkt->print());
+
+            //-----CHANGED----
+//              std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tRequested for SnoopResponse but didn't get" << "\n";
+    //          addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "Req", false);
+              //-----CHANGED----
+
             return false;
         }
     } else {
@@ -505,6 +639,12 @@ CoherentXBar::recvTimingSnoopResp(PacketPtr pkt, PortID slave_port_id)
         if (!respLayers[dest_port_id]->tryTiming(snoop_port)) {
             DPRINTF(CoherentXBar, "%s: src %s packet %s BUSY\n", __func__,
                     snoop_port->name(), pkt->print());
+
+            //-----CHANGED----
+//              std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tRequested for SnoopResponse but didn't get" << "\n";
+    //          addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "Req", false);
+              //-----CHANGED----
+
             return false;
         }
     }
@@ -530,7 +670,22 @@ CoherentXBar::recvTimingSnoopResp(PacketPtr pkt, PortID slave_port_id)
     calcPacketTiming(pkt, xbar_delay);
 
     // determine how long to be crossbar layer is busy
-    Tick packetFinishTime = clockEdge(Cycles(1)) + pkt->payloadDelay;
+//    Tick packetFinishTime = clockEdge(Cycles(1)) + pkt->payloadDelay;
+    //--------CHANGED------
+
+    //-----CHANGED----
+//      std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tSnoopResponse" << "\n";
+      addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "SnoopResp", false, 2);
+      //-----CHANGED----
+//
+    Tick packetFinishTime;
+    if(name().find("l3") != std::string::npos)
+    	packetFinishTime = clockEdge(Cycles(31)) + pkt->payloadDelay;
+    else if(name().find("l2") != std::string::npos)
+            	packetFinishTime = clockEdge(Cycles(11)) + pkt->payloadDelay;
+    else
+        packetFinishTime = clockEdge(Cycles(1)) + pkt->payloadDelay;
+    //--------CHANGED------
 
     // forward it either as a snoop response or a normal response
     if (forwardAsSnoop) {

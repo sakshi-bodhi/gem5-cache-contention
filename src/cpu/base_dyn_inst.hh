@@ -68,6 +68,7 @@
 #include "mem/request.hh"
 #include "sim/byteswap.hh"
 #include "sim/system.hh"
+#include "debug/MYINST.hh"
 
 /**
  * @file
@@ -556,6 +557,10 @@ class BaseDynInst : public ExecContext, public RefCounted
     bool isFirstMicroop() const { return staticInst->isFirstMicroop(); }
     bool isMicroBranch() const { return staticInst->isMicroBranch(); }
 
+    //------CHANGED---------
+    std::string getName() { return staticInst->getName(); }
+    //------CHANGED---------
+
     /** Temporarily sets this instruction as a serialize before instruction. */
     void setSerializeBefore() { status.set(SerializeBefore); }
 
@@ -890,6 +895,9 @@ BaseDynInst<Impl>::initiateMemRead(Addr addr, unsigned size,
         req = new Request(asid, addr, size, flags, masterId(), this->pc.instAddr(),
                           thread->contextId());
 
+        DPRINTF(MYINST, "LOADREQ memread inst seq no: [sn:%lli] \tData Address: %lli \tReq id: %lli\n", this->seqNum, addr, req->rid);
+//        std::cout << "\n" << curTick() << "\tLOADREQ memread inst sn " << this->seqNum << " data addr " << addr << " req id " << req->rid << "\n";
+
         req->taskId(cpu->taskId());
 
         // Only split the request if the ISA supports unaligned accesses.
@@ -945,6 +953,8 @@ BaseDynInst<Impl>::writeMem(uint8_t *data, unsigned size, Addr addr,
     } else {
         req = new Request(asid, addr, size, flags, masterId(), this->pc.instAddr(),
                           thread->contextId());
+
+//        std::cout << "\n" << curTick() << "\tLOADREQ memwrite inst sn " << this->seqNum << " data addr " << addr << " req id " << req->rid << "\n";
 
         req->taskId(cpu->taskId());
 

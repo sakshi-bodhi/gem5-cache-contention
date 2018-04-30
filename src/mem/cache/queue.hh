@@ -53,8 +53,11 @@
 
 #include "base/trace.hh"
 #include "debug/Drain.hh"
+#include "debug/CacheStatus.hh"
 #include "mem/cache/queue_entry.hh"
 #include "sim/drain.hh"
+//#include "mem/cache/base.hh"
+
 
 /**
  * A high-level queue interface, to be used by both the MSHR queue and
@@ -87,13 +90,24 @@ class Queue : public Drainable
     std::vector<Entry> entries;
     /** Holds pointers to all allocated entries. */
     typename Entry::List allocatedList;
+  public:
     /** Holds pointers to entries that haven't been sent downstream. */
     typename Entry::List readyList;
+  protected:
     /** Holds non allocated entries. */
     typename Entry::List freeList;
 
     typename Entry::Iterator addToReadyList(Entry* entry)
     {
+    	  //-----CHANGED----
+//    	std::cout << "name() in queue.hh " << name() << "\n";
+//    	std::cout << "mshr entry: " << entry << "\t" << "mshr order " << entry->order << "\n";
+//    	std::cout << "targetList size: " << entry->targets.size() << "\n";
+//    	for (auto i = entry->targets.begin(); i != entry->targets.end(); ++i) {
+//    		std::cout << (*i).pkt->req << "\t" << (*i).pkt->req->contextId() << "\t" << (*i).pkt->getAddr() << "\tmasterId() " << (*i).pkt->req->masterId() << "\n";
+//    	}
+    	  //-----CHANGED----
+
         if (readyList.empty() ||
             readyList.back()->readyTime <= entry->readyTime) {
             return readyList.insert(readyList.end(), entry);
@@ -116,6 +130,12 @@ class Queue : public Drainable
 
   public:
 
+
+    //--------CHANGED-------
+    int totalMSHRentries;
+    uint64_t totalMSHRDelay;
+    //--------CHANGED-------
+
     /**
      * Create a queue with a given number of entries.
      *
@@ -130,6 +150,11 @@ class Queue : public Drainable
         for (int i = 0; i < numEntries; ++i) {
             freeList.push_back(&entries[i]);
         }
+        //-----CHANGED----
+    	totalMSHRentries = 0;
+    	totalMSHRDelay = 0;
+    	std::cout << "Queue created for the entry above\n";
+        //-----CHANGED----
     }
 
     bool isEmpty() const
@@ -208,6 +233,11 @@ class Queue : public Drainable
         if (readyList.empty() || readyList.front()->readyTime > curTick()) {
             return nullptr;
         }
+
+        //--------CHANGED--------
+//        shuffleReadyList();
+        //--------CHANGED--------
+
         return readyList.front();
     }
 
@@ -224,15 +254,30 @@ class Queue : public Drainable
      */
     void deallocate(Entry *entry)
     {
+    	//-----CHANGED----
+    	totalMSHRDelay += curTick() - entry->arrivalTime;
+    	//-----CHANGED----
+
         allocatedList.erase(entry->allocIter);
         freeList.push_front(entry);
         allocated--;
         if (entry->inService) {
             _numInService--;
         } else {
+//        	std::cout << entry->getTarget()->pkt->getAddr() << " readyList.erase at " << curTick() << "\n";
+//        	std::cout << "readyList size before erase: " << readyList.size() << "\n";
             readyList.erase(entry->readyIter);
+//        	std::cout << "readyList size after erase: " << readyList.size() << "\n";
         }
         entry->deallocate();
+
+        DPRINTF(CacheStatus," (deleted): %d: \n", readyList.size());
+
+//        std::cout << curTick() <<"  ----------MSHR contains-----------\n";
+//            std::cout << "queue size: " << readyList.size() << "\n";
+//            for (auto i = readyList.begin(); i != readyList.end(); ++i) {
+//            	std::cout << curTick() << "\tmshr " << *i << "\t" << (*i)->readyTime << "\n";
+//            }
         if (drainState() == DrainState::Draining && allocated == 0) {
             // Notify the drain manager that we have completed
             // draining if there are no other outstanding requests in
@@ -242,10 +287,152 @@ class Queue : public Drainable
         }
     }
 
+    int readCoreId(std::string name) {		//reading first integer from a string as a core id
+
+      	std::vector<char> v(name.length() + 1);
+      	std::strcpy(&v[0], name.c_str());
+      	char* p = &v[0];
+      	long int core = -1;
+      	while (*p) { // While there are more characters to process...
+      	    if (isdigit(*p)) { // Upon finding a digit, ...
+      	        core = strtol(p, &p, 10); // Read a number, ...
+      //	        printf("CPU id %d\n", int(core)); // and print it.
+      	        break;
+      	    }
+      	    else { // Otherwise, move on to the next character.
+      	        p++;
+      	    }
+      	}
+      	return int(core);
+      }
+
+    void deallocateL3RQ(Entry *entry, bool isWB, std::string cacheName)
+    {
+        allocatedList.erase(entry->allocIterGlobal);
+        readyList.erase(entry->readyIterGlobal);
+        if(isWB) {
+
+     	   int id = readCoreId(cacheName);
+//    	   std::cout << curTick() << "\t" << int(curTick()/500) << "\t" << name() << "\t" << cacheName << "\t(WB deallocate)core id " << id << "\t" << entry << "\n";
+     	   setPriority(id, -2);
+        }
+        else {
+//     	   std::cout << curTick() << "\t" << int(curTick()/500) << "\t" << name() << "\t" << cacheName << "\t(MSHR deallocate)core id " << entry->getTarget()->pkt->req->masterId() << "\t" << entry << "\n";
+        	setPriority(entry->getTarget()->pkt->req->masterId(), -1);
+        }
+
+
+//        std::cout << "WB ready list size after deallocation: " << readyList.size() << "\n";
+//
+//           for (auto i = readyList.begin(); i != readyList.end(); ++i) {
+//           	std::cout << curTick() << "\twb_entry " << *i << "\t" <<  (*i)->readyTime << "\n";
+//           }
+//
+//           std::cout << "WB allocated list size after deallocation: " << allocatedList.size() << "\n";
+//
+//           for (auto i = allocatedList.begin(); i != allocatedList.end(); ++i) {
+//            	std::cout << curTick() << "\twb_entry " << *i << "\t" <<  (*i)->readyTime << "\n";
+//           }
+    }
+
+
     DrainState drain() override
     {
         return allocated == 0 ? DrainState::Drained : DrainState::Draining;
     }
+
+
+    //-----CHANGED------
+
+    void shuffleReadyList() {
+        std::cout << "shuffling readyList " << "\n";
+        for (auto i = readyList.begin(); i != readyList.end(); ++i) {
+        	if((*i)->readyTime <= curTick()) {
+        		if ((*i)->getTarget()->pkt->req->masterId() == 9 || (*i)->getTarget()->pkt->req->masterId() == 10) {
+        			readyList.erase((*i)->readyIter);
+        			(*i)->readyIter = readyList.insert(readyList.begin(), (*i));
+        			break;
+        		}
+        	}
+        	else {
+        		break;
+        	}
+        }
+    }
+
+
+    void dump()
+    {
+//        cprintf("============================================================\n");
+//        cprintf("MSHRQueue Dump  (cycle %d)\n", curTick());
+//        cprintf("------------------------------------------------------------\n");
+
+        if (allocatedList.empty() && readyList.empty())
+            cprintf("<No Events>\n");
+        else {
+//        	std::cout << "allocatedList size: " << allocatedList.size() << "\n";
+//            cprintf("------------------------------------------------------------\n");
+        	for (auto& entry : allocatedList) {
+            	entry->print_mshr();
+        	}
+        	std::cout << "readyList size: " << readyList.size() << "\n";
+//            cprintf("------------------------------------------------------------\n");
+//        	printf("printing readyList\n");
+        	printReadyList();
+//        	printf("printing done!!\n");
+        	for (auto& entry : readyList) {
+        		entry->print_mshr();
+        	}
+//        	std::cout << "freeList size: " << freeList.size() << "\n";
+//            cprintf("------------------------------------------------------------\n");
+        	for (auto& entry : freeList) {
+        		entry->print_mshr();
+        	}
+        }
+
+//        cprintf("============================================================\n");
+    }
+
+    void printReadyList() {
+        int count = 0;
+        uint64_t rTime = 0;
+        auto i = readyList.begin();
+        rTime = (*i)->readyTime;
+      //  printf("recvTime %lu, readyTime %lu \t", (*i)->recvTime, (*i)->readyTime);
+        i++;
+        for (; i != readyList.end(); ++i) {
+        //	printf("recvTime %lu, readyTime %lu \t", (*i)->recvTime, (*i)->readyTime);
+        	if ((*i)->readyTime == rTime) {
+        		count++;
+        	}
+        	else {
+        		rTime = (*i)->readyTime;
+        		count = 0;
+        	}
+        	if(count > 0) {
+//        		printf("'count' is more than 0\n");
+        		std::cout << "count is " << count << "\n";
+        		break;
+        	}
+        }
+//        shuffleReadyList();
+    }
+
+    int ret_numEntries()
+    {
+        return numEntries;
+    }
+
+
+    	void print_queue() {
+                    std::cout << "Allocated entries "<< allocated << "\t entries in service="<< _numInService <<"\n";
+                    for (const auto& entry : allocatedList) {
+                  	  std::cout << "entry->blkAddr " << entry->blkAddr << "\n";
+                  	  //std::cout << "mshrQueue next ready time=" << mshrQueue.nextReadyTime() << "\n";
+                    }
+    }
+          //-----CHANGED----
+
 };
 
 #endif //__MEM_CACHE_QUEUE_HH__

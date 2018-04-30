@@ -49,28 +49,132 @@
 
 using namespace std;
 
+
+
 MSHRQueue::MSHRQueue(const std::string &_label,
                      int num_entries, int reserve, int demand_reserve)
     : Queue<MSHR>(_label, num_entries, reserve),
       demandReserve(demand_reserve)
-{}
+      {
+//      {	std::cout << "Queue created for the entry type MSHR, has " << num_entries << " entries\n";
+      }
+
 
 MSHR *
 MSHRQueue::allocate(Addr blk_addr, unsigned blk_size, PacketPtr pkt,
-                    Tick when_ready, Counter order, bool alloc_on_fill)
+                    Tick when_ready, Counter order, bool alloc_on_fill, std::string cacheName)
 {
     assert(!freeList.empty());
     MSHR *mshr = freeList.front();
     assert(mshr->getNumTargets() == 0);
     freeList.pop_front();
+//    std::cout << curTick() <<"  ----------MSHR of " << cacheName << " contains-----------\n";
+//    std::cout << "queue size: " << readyList.size() << "\n";
+//    for (auto i = readyList.begin(); i != readyList.end(); ++i) {
+//    	std::cout << curTick() << "\tmshr " << *i << "\t" << (*i)->readyTime << "\n";
+//    }
+
+    //----------CHANGED----------
+       if(cacheName.find("l2") != std::string::npos) {
+//    	   std::cout <<curTick() << "\t" << pkt->getAddr() <<" -> Packet came into local queue of cache " << cacheName << "\n";
+       	calcQSize(cacheName, curTick(), readyList.size());
+       }
+   	//----------CHANGED----------
 
     mshr->allocate(blk_addr, blk_size, pkt, when_ready, order, alloc_on_fill);
     mshr->allocIter = allocatedList.insert(allocatedList.end(), mshr);
     mshr->readyIter = addToReadyList(mshr);
 
+
+//    int Qsize = 0;
+//    for (auto i = readyList.begin(); i != readyList.end(); ++i) {
+//            	if((*i)->readyTime <= curTick()) {
+//            		Qsize++;
+//            	}
+//            	else {
+//            		continue;
+//            	}
+//            }
+//	recordStatus(curTick(), name(), "mshr", allocatedList.size(), Qsize, "none");
+
+//    std::cout << curTick() <<"  ----------MSHR of " << cacheName << " contains-----------\n";
+//    std::cout << "queue size: " << readyList.size() << "\n";
+//    for (auto i = readyList.begin(); i != readyList.end(); ++i) {
+//    	std::cout << curTick() << "\tmshr " << *i << "\t" << (*i)->readyTime << "\n";
+//    }
+
+    //--------CHANGED----------
+
+//    if(isL2Cache) {
+//    	  mshr->allocIterGlobal = l3ReqQueue->allocatedList.insert(l3ReqQueue->allocatedList.end(), mshr);
+//    	  mshr->readyIterGlobal = l3ReqQueue->addToReadyList(mshr);
+//    }
+//    else {
+//    	 mshr->allocIterGlobal = NULL;
+//    	 mshr->readyIterGlobal = NULL;
+//    }
+
+     //--------CHANGED----------
+
     allocated += 1;
+
+    	//-----CHANGED----
+
+       		totalMSHRentries += 1;
+       	//-----CHANGED----
+
     return mshr;
 }
+int timer = 0;
+MSHR*
+MSHRQueue::allocateL3RQ(MSHR *mshr, std::string cacheName)
+{
+	int Qsize = 0;
+//	if(timer < 11) {
+        for (auto i = readyList.begin(); i != readyList.end(); ++i) {
+//	        	std::cout << "mshr " << *i << "\t" <<  curTick() << "\t" << (*i)->readyTime << "\n";
+        	if((*i)->readyTime <= curTick()) {
+        		Qsize++;
+        	}
+        	else {
+        		continue;
+        	}
+        }
+        std::ostringstream stringStream;
+        stringStream << mshr;
+        std::string addrMSHR = stringStream.str();
+//        std::string buffer;
+//        sprintf (buffer, "Little %llx", mshr);
+//        std::cout << "LITTLE " << buffer << "\n";
+	calcGQSize(cacheName+"GlobalMSHR", addrMSHR, curTick(), mshr->readyTime, Qsize, "I");
+	mshr->allocIterGlobal = allocatedList.insert(allocatedList.end(), mshr);
+    mshr->readyIterGlobal = addToReadyList(mshr);
+    Qsize = 0;
+//	   std::cout << curTick() << "\t" << int(curTick()/500) << "\t" << name() << "\t" << cacheName << "\t(MSHR allocate)core id " << mshr->getTarget()->pkt->req->masterId() << "\t" << mshr << "\t" <<  mshr->readyTime << "\n";
+    setPriority(mshr->getTarget()->pkt->req->masterId(), 1);
+
+        for (auto i = readyList.begin(); i != readyList.end(); ++i) {
+        	if((*i)->readyTime <= curTick()) {
+        		Qsize++;
+        	}
+        	else {
+        		continue;
+        	}
+        }
+//    for (auto i = readyList.begin(); i != readyList.end(); ++i) {
+//            	if((*i)->readyTime <= curTick()) {
+//            		Qsize++;
+//            	}
+//            	else {
+//            		continue;
+//            	}
+//            }
+//	recordStatus(curTick(), name(), "globalL3Q", allocatedList.size(), Qsize, "none");
+
+    return mshr;
+
+}
+
 
 void
 MSHRQueue::moveToFront(MSHR *mshr)
@@ -118,3 +222,5 @@ MSHRQueue::forceDeallocateTarget(MSHR *mshr)
     // Notify if MSHR queue no longer full
     return was_full && !isFull();
 }
+
+

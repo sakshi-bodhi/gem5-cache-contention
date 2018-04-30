@@ -447,6 +447,7 @@ dumpstats(ThreadContext *tc, Tick delay, Tick period)
 
     Tick when = curTick() + delay * SimClock::Int::ns;
     Tick repeat = period * SimClock::Int::ns;
+//    std::cout << curTick() << "\tdumpstats: delay- " << when << "\t repeat- " << repeat << "\n";
 
     Stats::schedStatEvent(true, false, when, repeat);
 }

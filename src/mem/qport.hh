@@ -64,7 +64,13 @@ class QueuedSlavePort : public SlavePort
     /** Packet queue used to store outgoing responses. */
     RespPacketQueue &respQueue;
 
-    void recvRespRetry() { respQueue.retry(); }
+    void recvRespRetry() {
+    	//    -----CHANGED----
+    	//if(pkt->getAddr() == 960){
+//    	std::cout << curTick() << "\trespQueue name()=" << respQueue.name() << "\tQueuedSlavePort::recvRespRetry()\t" << respQueue.size() << "\n";
+    	//}
+    	//    -----CHANGED----
+    	respQueue.retry(); }
 
   public:
 
@@ -115,7 +121,15 @@ class QueuedMasterPort : public MasterPort
     /** Packet queue used to store outgoing snoop responses. */
     SnoopRespPacketQueue &snoopRespQueue;
 
-    void recvReqRetry() { reqQueue.retry(); }
+    void recvReqRetry() {
+    	//    -----CHANGED----
+    	//if(pkt->getAddr() == 960){
+//    	std::cout << curTick() << "reqQueue name()=" << reqQueue.name() << "\tQueuedMasterPort::recvReqRetry()\t" << reqQueue.size() << "\n";
+    	//}
+    	//    -----CHANGED----
+//    	std::cout << curTick() << "reqQueue (inside QueuedMasterPort::recvReqRetry()) " << reqQueue.name() << " recieved a retry. Its size is " << reqQueue.size() << "\n";
+
+    	reqQueue.retry(); }
 
     void recvRetrySnoopResp() { snoopRespQueue.retry(); }
 

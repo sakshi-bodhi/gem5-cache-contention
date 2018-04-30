@@ -88,6 +88,10 @@ simulate(Tick num_cycles)
     static bool threads_initialized = false;
     static std::vector<std::thread *> threads;
 
+    //-----CHANGED----
+    std::cout << "simulate(): num_cycles=" << num_cycles << "\n";
+    //-----CHANGED----
+
     if (!threads_initialized) {
         threadBarrier = new Barrier(numMainEventQueues);
 
@@ -179,6 +183,11 @@ testAndClearAsyncEvent()
 Event *
 doSimLoop(EventQueue *eventq)
 {
+	//-----CHANGED----
+		   std::cout << "doSimLoop(): eventq head= " << eventq->getHead() << "\n";
+	       std::cout << "doSimLoop(): eventq head tick= " << eventq->getHead()->when() << "\n";
+	//-----CHANGED----
+
     // set the per thread current eventq pointer
     curEventQueue(eventq);
     eventq->handleAsyncInsertions();

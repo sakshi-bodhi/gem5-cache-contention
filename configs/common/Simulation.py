@@ -39,6 +39,7 @@
 #
 # Authors: Lisa Hsu
 
+import pdb
 import sys
 from os import getcwd
 from os.path import join as joinpath
@@ -69,6 +70,7 @@ def setCPUClass(options):
     """
 
     TmpClass, test_mem_mode = getCPUClass(options.cpu_type)
+#    pdb.set_trace()
     CPUClass = None
     if TmpClass.require_caches() and \
             not options.caches and not options.ruby:
@@ -464,6 +466,7 @@ def run(options, root, testsys, cpu_class):
             switch_cpus[i].clk_domain = testsys.cpu[i].clk_domain
             switch_cpus[i].progress_interval = \
                 testsys.cpu[i].progress_interval
+
             # simulation period
             if options.maxinsts:
                 switch_cpus[i].max_insts_any_thread = options.maxinsts
@@ -521,6 +524,7 @@ def run(options, root, testsys, cpu_class):
         for i in xrange(np):
             switch_cpus[i].system =  testsys
             switch_cpus_1[i].system =  testsys
+#	    pdb.set_trace()
             switch_cpus[i].workload = testsys.cpu[i].workload
             switch_cpus_1[i].workload = testsys.cpu[i].workload
             switch_cpus[i].clk_domain = testsys.cpu[i].clk_domain

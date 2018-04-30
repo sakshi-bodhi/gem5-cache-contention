@@ -101,6 +101,12 @@ DebugFlag('O3PipeView')
 DebugFlag('PCEvent')
 DebugFlag('Quiesce')
 DebugFlag('Mwait')
+DebugFlag('CpuStatus')
+DebugFlag('MYRENAME')
+DebugFlag('MYIEW')
+DebugFlag('MYIQ')
+DebugFlag('MYROB')
+DebugFlag('MYINST')
 
 CompoundFlag('ExecAll', [ 'ExecEnable', 'ExecCPSeq', 'ExecEffAddr',
     'ExecFaulting', 'ExecFetchSeq', 'ExecOpClass', 'ExecRegDelta',

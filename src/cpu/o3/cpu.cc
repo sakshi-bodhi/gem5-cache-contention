@@ -67,6 +67,8 @@
 #include "sim/stat_control.hh"
 #include "sim/system.hh"
 
+#include "sim/pseudo_inst.hh"
+
 #if THE_ISA == ALPHA_ISA
 #include "arch/alpha/osfpal.hh"
 #include "debug/Activity.hh"
@@ -535,6 +537,8 @@ FullO3CPU<Impl>::regStats()
         .prereq(miscRegfileWrites);
 }
 
+//int flag =0;
+
 template <class Impl>
 void
 FullO3CPU<Impl>::tick()
@@ -544,6 +548,25 @@ FullO3CPU<Impl>::tick()
     assert(drainState() != DrainState::Drained);
 
     ++numCycles;
+
+//    std::cout << name() << " numThreads " << numThreads << " \n";
+//    for (ThreadID tid = 0; tid < numThreads; tid++) {
+//    std::cout << name() << "\t***********DUMPING INSTRUCTIONS*********\n";
+//    dumpInsts();
+//    if(flag == 0) {
+//        ThreadContext *tc = threadContexts[0];
+//        PseudoInst::dumpstats(tc, 10000, 100000);
+////    	Stats::periodicStatDump(100000); // it resets the statistics everytime.
+//        flag = 1;
+//    }
+    //    if (curTick() == 100000000) {
+//        exitSimLoop("My_exit");
+//    }
+//    }
+
+//    std::cout << curTick() << "\tCPU name- " << name() << "\tnumCycles.value() " << numCycles.value() << "\n";
+//    std::cout << curTick() << "\tschedDcacheEvent() " << numCycles.value() << "\tclockEdge() " << clockEdge() << "\tclockPeriod() " << clockPeriod() << "\n";
+
     ppCycles->notify(1);
 
 //    activity = false;
@@ -1633,6 +1656,8 @@ FullO3CPU<Impl>::wakeCPU()
         numCycles += cycles;
         ppCycles->notify(cycles);
     }
+//        std::cout << curTick() << "\twakeup()- CPU name- " << name() << "\tnumCycles.value() " << numCycles.value() << "\tcycles " << cycles << "\n";
+
 
     schedule(tickEvent, clockEdge());
 }

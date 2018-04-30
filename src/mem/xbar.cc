@@ -48,12 +48,15 @@
  */
 
 #include "mem/xbar.hh"
+#include "mem/cache/base.hh"
 
 #include "base/misc.hh"
 #include "base/trace.hh"
 #include "debug/AddrRanges.hh"
+#include "debug/DelayPath.hh"
 #include "debug/Drain.hh"
 #include "debug/XBar.hh"
+#include "debug/PktTrace.hh"
 
 BaseXBar::BaseXBar(const BaseXBarParams *p)
     : MemObject(p),
@@ -65,7 +68,13 @@ BaseXBar::BaseXBar(const BaseXBarParams *p)
                           p->port_master_connection_count, false),
       gotAllAddrRanges(false), defaultPortID(InvalidPortID),
       useDefaultRange(p->use_default_range)
-{}
+{
+	   std::cout << "---BaseXBar--- \n";
+	   for (auto m: masterPorts)
+	          std::cout << m << "\n";
+	   for (auto s: slavePorts)
+	   	          std::cout << s << "\n";
+}
 
 BaseXBar::~BaseXBar()
 {
@@ -149,6 +158,7 @@ BaseXBar::Layer<SrcType,DstType>::Layer(DstType& _port, BaseXBar& _xbar,
     port(_port), xbar(_xbar), _name(_name), state(IDLE),
     waitingForPeer(NULL), releaseEvent(this)
 {
+	   std::cout << "---Layer--- Port " << _port.name() << "\t xbar" << _xbar.name() << "\t name" << _name << "\n";
 }
 
 template <typename SrcType, typename DstType>
@@ -163,6 +173,9 @@ void BaseXBar::Layer<SrcType,DstType>::occupyLayer(Tick until)
     // until should never be 0 as express snoops never occupy the layer
     assert(until != 0);
     xbar.schedule(releaseEvent, until);
+
+    std::cout << curTick() << "\tTrace " << name() << " occupyLayer(xbar.cc): Layer is occupied until:\t" << until << "\n";
+    DPRINTF(PktTrace, "%s: occupyLayer(xbar.cc): Layer is occupied until:\t %ld\n", name(), until);
 
     // account for the occupied ticks
     occupancy += until - curTick();
@@ -193,9 +206,25 @@ BaseXBar::Layer<SrcType,DstType>::tryTiming(SrcType* src_port)
         // layer to be freed up (and in the case of a busy peer, for
         // that transaction to go through, and then the layer to free
         // up)
+
+
+        //--------CHANGED-------
+        if(waitingForLayer.size() == 0) {
+        	layerLastFreeAt = curTick();
+        }
+        //--------CHANGED-------
+
+
         waitingForLayer.push_back(src_port);
+                std::cout << curTick() << "\t" << name() << "\tLayer is busy. Push port id " << src_port->getId() << " to WFL with size: \t" << waitingForLayer.size() << "\n";
+//        std::cout << curTick() << "\tpush\t" << waitingForLayer.size() << "\t" << layerLastFreeAt << "\t" << layerBusyFor << "\t" << name() << "\n";
+//        std::cout<< "xbar---Port which is waitingForLayer : " << name() << "\tis " << src_port << "\n";
         return false;
     }
+
+//    if(src_port->name().find("tol3bus.slave") != std::string::npos) {
+//     	retryingCore(src_port->getId());
+//     }
 
     state = BUSY;
 
@@ -210,7 +239,10 @@ BaseXBar::Layer<SrcType,DstType>::succeededTiming(Tick busy_time)
     // test
     assert(state == BUSY);
 
+    std::cout << curTick() << "\tTrace " << name() << " succeededTiming(xbar.cc): now occupying layer for \t" << busy_time << " ticks\n";
+
     // occupy the layer accordingly
+//    std::cout<< "xbar---succeededTiming::Layer- " << name() << "\t is BUSY for " << (busy_time - curTick()) << "\n";
     occupyLayer(busy_time);
 }
 
@@ -233,6 +265,7 @@ BaseXBar::Layer<SrcType,DstType>::failedTiming(SrcType* src_port,
     assert(state == BUSY);
 
     // occupy the bus accordingly
+    std::cout << curTick() << "\tTrace " << name() << " failedTiming(xbar.cc): now occupying layer for \t" << busy_time << " ticks:\t and retrying src_port is " << src_port->getId() << "\n";
     occupyLayer(busy_time);
 }
 
@@ -244,8 +277,13 @@ BaseXBar::Layer<SrcType,DstType>::releaseLayer()
     assert(state == BUSY);
     assert(!releaseEvent.scheduled());
 
+    std::cout << curTick() << "\tTrace " << name() << " releaseLayer(xbar.cc): Layer is released at:\t" << curTick() << "\n";
+    DPRINTF(PktTrace, "%s: releaseLayer(xbar.cc): Layer is released at:\t %ld\n", name(), curTick());
+
     // update the state
     state = IDLE;
+
+//    std::cout<< "xbar---releaseLayer::Layer " << name() << "is IDLE now\n";
 
     // bus layer is now idle, so if someone is waiting we can retry
     if (!waitingForLayer.empty()) {
@@ -276,7 +314,66 @@ BaseXBar::Layer<SrcType,DstType>::retryWaiting()
     // set the retrying port to the front of the retry list and pop it
     // off the list
     SrcType* retryingPort = waitingForLayer.front();
+
+//    std::cout << curTick() << " retryingPort id" << retryingPort->getId() << " retryingPort name" << retryingPort->name()  << "\n";
+
+//    //--------PRINTS----------
+//    if(retryingPort->name().find("tol3bus.slave") != std::string::npos) {
+//    	std::cout <<curTick() << "\t bus name: " << name() << " waitingForLayer size " << waitingForLayer.size() << "\n";
+//    	for(int i = 0; i < waitingForLayer.size(); i++) {
+//    		std::cout << ' ' << waitingForLayer.at(i)->getId();
+//    	}
+//    	std::cout << "\n";
+//        std::cout << "retrying port id taken " << retryingPort->getId() << "\n";
+//    }
+//
+//    //--------PRINTS----------
+
+
+//    //-------PRIORITIZATION-------------
+//
+//    if(retryingPort->name().find("tol3bus.slave") != std::string::npos) {
+////    if(retryingPort->name().find("tol3bus") != std::string::npos) {
+//    	int priority = getPriority();
+////
+////    	//--------PRINTS----------
+////    	std::cout << "retrying port id taken before priority " << retryingPort->getId() << "\n";
+////    	if(priority==0)
+////    		std::cout << "Ports 0,1,2,3 will get priority\n";
+////    	else
+////    		std::cout << "Ports 4,5,6,7 will get priority\n";
+////        //--------PRINTS----------
+//
+//    	retryingPort = findPrioritizedPort(priority, retryingPort);
+////    	//--------PRINTS----------
+////    	std::cout << "retrying port id taken after priority " << retryingPort->getId() << "\n";
+////
+////        std::cout << "waitingForLayer size " << waitingForLayer.size() << "(after prioritization deque looks like)\n";
+////        for(int i = 0; i < waitingForLayer.size(); i++) {
+////        	std::cout << ' ' << waitingForLayer.at(i)->getId();
+////        }
+////        std::cout << "\n";
+////        //--------PRINTS----------
+//}
+    //-------PRIORITIZATION-------------
+
+        if(retryingPort->name().find("tol3bus.slave") != std::string::npos) {
+        	retryingCore(retryingPort->getId());
+        }
+        std::cout << curTick() << "\tTrace " << name() << " retryWaiting(xbar.cc): retrying port is\t" << retryingPort->getId() << "\n";
     waitingForLayer.pop_front();
+    //--------Changed----------
+
+
+    //--------CHANGED-------
+    if(waitingForLayer.size() == 0) {
+    	layerBusyFor += (curTick() - layerLastFreeAt);
+    }
+//    std::cout << curTick() << "\tpop\t" << waitingForLayer.size() << "\t" << layerLastFreeAt << "\t" << layerBusyFor << "\t" << name() << "\n";
+    //--------CHANGED-------
+
+
+//    std::cout<< "xbar---retryWaiting::Layer - " << name() << "\t is retrying for port: " << retryingPort << "\n";
 
     // tell the port to retry, which in some cases ends up calling the
     // layer again
@@ -289,6 +386,8 @@ BaseXBar::Layer<SrcType,DstType>::retryWaiting()
         // update the state to busy and reset the retrying port, we
         // have done our bit and sent the retry
         state = BUSY;
+
+//        std::cout<< "xbar---retryWaiting::occupying layer- " << name() << "\tfor one cycle for port: " << retryingPort << "\n";
 
         // occupy the crossbar layer until the next clock edge
         occupyLayer(xbar.clockEdge());
@@ -306,13 +405,24 @@ BaseXBar::Layer<SrcType,DstType>::recvRetry()
     // add the port where the failed packet originated to the front of
     // the waiting ports for the layer, this allows us to call retry
     // on the port immediately if the crossbar layer is idle
+
+    //--------CHANGED-------
+    if(waitingForLayer.size() == 0) {
+    	layerLastFreeAt = curTick();
+    }
+    //--------CHANGED-------
+
     waitingForLayer.push_front(waitingForPeer);
+//    std::cout << curTick() << "\tpushFront\t" << waitingForLayer.size() << "\t" << layerLastFreeAt << "\t" << layerBusyFor << "\t" << name() << "\n";
 
     // we are no longer waiting for the peer
     waitingForPeer = NULL;
 
     // if the layer is idle, retry this port straight away, if we
     // are busy, then simply let the port wait for its turn
+
+    std::cout << curTick() << "\tTrace " << name() << " recvRetry(xbar.cc): waitingForPeer port is\t" << waitingForPeer->getId() << "\n";
+
     if (state == IDLE) {
         retryWaiting();
     } else {
@@ -621,6 +731,70 @@ BaseXBar::Layer<SrcType,DstType>::regStats()
 
     utilization = 100 * occupancy / simTicks;
 }
+
+//******CHANGED******
+template <typename SrcType, typename DstType>
+SrcType*
+BaseXBar::Layer<SrcType,DstType>::findPrioritizedPort(int priority, SrcType* retryingPort) {
+//	    int wflIndexCount = waitingForLayer.size();
+//	    if(priority == 0) {
+////	    	while((retryingPort->getId() != 0 && retryingPort->getId() != 1 && retryingPort->getId() != 2 && retryingPort->getId() != 3 && wflIndexCount > 0))
+//	    	while((retryingPort->getId() >= 4 && retryingPort->getId() < 8) && wflIndexCount > 0)
+//	    	{
+//	    		wflIndexCount--;
+//	    		SrcType* newRetryingPort = waitingForLayer.front();
+//	    		waitingForLayer.push_back(newRetryingPort);
+//	    		//        std::cout << "newRetrying port id " << newRetryingPort->getId() << "\n";
+//	    		waitingForLayer.pop_front();
+//	    		retryingPort = waitingForLayer.front();
+//	    		//        std::cout << "changed retrying port id to " << retryingPort->getId() << "\n";
+//	    		}
+//	    }
+//	    else {
+////	    	while((retryingPort->getId() != 4 && retryingPort->getId() != 5 && retryingPort->getId() != 6 && retryingPort->getId() != 7 && wflIndexCount > 0))
+//	    	while((retryingPort->getId() >= 0 && retryingPort->getId() < 4) && wflIndexCount > 0)
+//	    	{
+//	    		wflIndexCount--;
+//	    		SrcType* newRetryingPort = waitingForLayer.front();
+//	    		waitingForLayer.push_back(newRetryingPort);
+//	    		//        std::cout << "newRetrying port id " << newRetryingPort->getId() << "\n";
+//	    		waitingForLayer.pop_front();
+//	    		retryingPort = waitingForLayer.front();
+//	    		//        std::cout << "changed retrying port id to " << retryingPort->getId() << "\n";
+//	    		}
+//	    }
+	int wflSize= waitingForLayer.size();
+	    if(priority == 0) {
+	    	int i;
+	    	for(i = 0; i < wflSize; i++){
+	    		if(waitingForLayer.at(i)->getId() >= 4 && waitingForLayer.at(i)->getId() < 8){
+	    			continue;
+	    		}
+	    		else {
+	    			waitingForLayer.push_front(waitingForLayer.at(i));
+	    			waitingForLayer.erase(waitingForLayer.begin()+(i+1));
+	    			retryingPort = waitingForLayer.front();
+	    			break;
+	    		}
+	    	}
+	    }
+	    else{
+	    	int i;
+	    	for(i = 0; i < wflSize; i++){
+	    		if(waitingForLayer.at(i)->getId() >= 0 && waitingForLayer.at(i)->getId() < 4){
+	    			continue;
+	    		}
+	    		else {
+	    			waitingForLayer.push_front(waitingForLayer.at(i));
+	    			waitingForLayer.erase(waitingForLayer.begin()+(i+1));
+	    			retryingPort = waitingForLayer.front();
+	    			break;
+	    		}
+	    	}
+	    }
+	    return retryingPort;
+}
+//******CHANGED******
 
 /**
  * Crossbar layer template instantiations. Could be removed with _impl.hh

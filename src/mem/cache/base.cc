@@ -58,6 +58,7 @@
 
 using namespace std;
 
+
 BaseCache::CacheSlavePort::CacheSlavePort(const std::string &_name,
                                           BaseCache *_cache,
                                           const std::string &_label)
@@ -85,6 +86,8 @@ BaseCache::BaseCache(const BaseCacheParams *p, unsigned blk_size)
       noTargetMSHR(nullptr),
       missCount(p->max_miss_count),
       addrRanges(p->addr_ranges.begin(), p->addr_ranges.end()),
+      l3ReqQueue("l3ReqQueueMSHRs", p->mshrs, 0, p->demand_mshr_reserve),
+      l3WBReqQueue("l3ReqQueueWBs", p->write_buffers, p->mshrs),
       system(p->system)
 {
     // the MSHR queue has no reserve entries as we check the MSHR
@@ -95,8 +98,15 @@ BaseCache::BaseCache(const BaseCacheParams *p, unsigned blk_size)
 
     // forward snoops is overridden in init() once we can query
     // whether the connected master is actually snooping or not
-}
 
+
+    //-----CHANGED----
+	std::cout << "Creating queue for MSHRs...\n";
+   // std::cout << "For cache " << p->name << "\tSize: "<< p->size << "\tData latency" << p->data_latency;
+    //-----CHANGED----
+
+}
+     
 void
 BaseCache::CacheSlavePort::setBlocked()
 {

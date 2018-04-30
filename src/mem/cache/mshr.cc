@@ -125,7 +125,7 @@ MSHR::TargetList::add(PacketPtr pkt, Tick readyTime,
         }
     }
 
-    emplace_back(pkt, readyTime, order, source, markPending, alloc_on_fill);
+    emplace_back(pkt, readyTime, order, source, markPending, alloc_on_fill); // inserts the new element at the end of the vector
 }
 
 
@@ -240,6 +240,7 @@ void
 MSHR::allocate(Addr blk_addr, unsigned blk_size, PacketPtr target,
                Tick when_ready, Counter _order, bool alloc_on_fill)
 {
+	arrivalTime = curTick();
     blkAddr = blk_addr;
     blkSize = blk_size;
     isSecure = target->isSecure();
@@ -290,7 +291,7 @@ MSHR::markInService(bool pending_modified_resp)
 void
 MSHR::deallocate()
 {
-    assert(targets.empty());
+	assert(targets.empty());
     targets.resetFlags();
     assert(deferredTargets.isReset());
     inService = false;
@@ -557,13 +558,15 @@ MSHR::checkFunctional(PacketPtr pkt)
 bool
 MSHR::sendPacket(Cache &cache)
 {
+//	std::cout << "sendPacket from cache: " << cache.name() << "\n";
     return cache.sendMSHRQueuePacket(this);
 }
 
 void
 MSHR::print(std::ostream &os, int verbosity, const std::string &prefix) const
 {
-    ccprintf(os, "%s[%#llx:%#llx](%s) %s %s %s state: %s %s %s %s %s\n",
+
+	ccprintf(os, "%s[%#llx:%#llx](%s) %s %s %s state: %s %s %s %s %s\n",
              prefix, blkAddr, blkAddr + blkSize - 1,
              isSecure ? "s" : "ns",
              isForward ? "Forward" : "",
@@ -592,3 +595,52 @@ MSHR::print() const
     print(str);
     return str.str();
 }
+
+//-----CHANGED-------
+    void MSHR::print_mshr(){
+
+    	if (!targets.empty()) {
+    		std::cout << "packet addr: " << getTarget()->pkt->getAddr() << "\n";
+    	}
+    	std::cout << "mshr request ready time: " << readyTime << "\n";
+    	cprintf("curTick()= %d, \t arrivalTime= %d \n", curTick(), arrivalTime);
+    	cprintf("delay: %d \n", (curTick()-arrivalTime));
+    	printf("[%#lx:%#lx](%s) %s %s %s state: %s %s %s %s %s\n",
+                 blkAddr, blkAddr + blkSize - 1,
+                 isSecure ? "s" : "ns",
+                 isForward ? "Forward" : "",
+                 allocOnFill() ? "AllocOnFill" : "",
+                 needsWritable() ? "Wrtbl" : "",
+                 _isUncacheable ? "Unc" : "",
+                 inService ? "InSvc" : "",
+                 downstreamPending ? "DwnPend" : "",
+                 postInvalidate ? "PostInv" : "",
+                 postDowngrade ? "PostDowngr" : "");
+
+
+       /* if (!targets.empty()) {
+            printf(" Targets List size: %lu\n", targets.size() );
+           TargetList::const_iterator i = targets.begin();
+           TargetList::const_iterator end = targets.end();
+
+               for (; i != end; ++i) {
+                   Target obj = *i;
+
+                   printf("[%lx:%lx] \t",obj.pkt->getAddr(), obj.pkt->getAddr()+blkSize-1);
+                   printf("packet depth: %d, packet master: %d \n",obj.pkt->req->depth , obj.pkt->req->masterId());
+                   printf("recvTime %lu, readyTime %lu \t", obj.recvTime, obj.readyTime);
+                   printf("source: %d  (0-cpu, 1-snoop, 2-prefetcher)\n", obj.source);
+               }
+        }
+        if (!deferredTargets.empty()) {
+        	 printf(" Deferred Targets List size: %lu\n", targets.size() );
+        	 TargetList::const_iterator i = deferredTargets.begin();
+        	 TargetList::const_iterator end = deferredTargets.end();
+        	 for (; i != end; ++i) {
+        		 Target obj = *i;
+        		 std::cout << "packet " << obj.pkt->getAddr() << "\n";
+        	 }
+        }*/
+
+}
+    //-----CHANGED-------

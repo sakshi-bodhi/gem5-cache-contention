@@ -259,12 +259,14 @@ class MSHR : public QueueEntry, public Printable
      * @sa MissQueue, MSHRQueue::readyList
      */
     Iterator readyIter;
+    Iterator readyIterGlobal;	// entry in l3ReqQueue
 
     /**
      * Pointer to this MSHR on the allocated list.
      * @sa MissQueue, MSHRQueue::allocatedList
      */
     Iterator allocIter;
+    Iterator allocIterGlobal;	// entry in l3ReqQueue
 
     /** List of all requests that match the address */
     TargetList targets;
@@ -369,6 +371,12 @@ class MSHR : public QueueEntry, public Printable
      * @return string with mshr fields + [deferred]targets
      */
     std::string print() const;
+
+
+    //-----CHANGED-------
+    void print_mshr();
+    //-----CHANGED-------
+
 };
 
 #endif // __MEM_CACHE_MSHR_HH__

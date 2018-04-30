@@ -45,14 +45,61 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <map>
 
 #include "base/flags.hh"
 #include "base/types.hh"
 #include "debug/Event.hh"
 #include "sim/serialize.hh"
+//#include "sim/mystats.hh"
+#include "sim/mypriority.hh"
 
 class EventQueue;       // forward declaration
 class BaseGlobalEvent;
+
+//---------CHANGED-----------
+class coreStatus;
+class coreStatusVector;
+class L3QStatus;
+class L3QStatusVector;
+class qLength;
+class CycleInfo;
+class CycleVector;
+class PacketStageInfo;
+class PacketInfo;
+class PacketDelayPathInfo;
+class PacketDelayInfo;
+class Record;
+class TotalStats;
+
+extern std::map<uint64_t, CycleVector> cycleMap;
+extern std::map<uint64_t, PacketInfo> map1;
+extern std::map<uint64_t, PacketDelayInfo> map2;
+//extern std::map<uint64_t, uint64_t> l3busDelay;
+
+
+void recordL3Status(Tick tick, std::string stageString, std::string stageName, int groupT1count, int groupT2count, std::vector<int> requestCount, int groupO1count, int groupO2count, std::vector<int> reqOutStCount, int prioritizedCore);
+void recordStatus(Tick tick, std::string stageString, std::string stageName, int status, int overall_status, std::string info);
+void initDelayPath(uint64_t rid, uint64_t pktAddr, int masterId, uint64_t arrivalTime);
+void addToDelayPath(uint64_t rid, uint64_t pktAddr, uint64_t atTick, std::string stageName, std::string type, bool isFinish, int isHit);
+void calcDelayPath(int pid);
+void calcQTime(uint64_t fromTick, uint64_t toTick);
+void calcThroughput();
+void calcQSize(std::string cacheName, uint64_t atTick, uint64_t qSize);
+void calcGQSize(std::string cacheName, std::string mshr, uint64_t curTick, uint64_t atTick, uint64_t qSize, std::string mode);
+
+//uint64_t getPriority();
+//void setPriority(uint64_t masterId, int pri);
+
+//void printCacheAccessMap(uint64_t totalAccess, std::map<uint64_t, std:vector<uint64_t>> &Map);
+//void calcL3BusDelay(uint64_t delay);
+
+//--------CHANGED--------
+extern uint64_t reqIdCounter;	// global packet id counter
+uint64_t getRequestId();	//returns a unique packet id
+//--------CHANGED--------
+
+//---------CHANGED-----------
 
 //! Simulation Quantum for multiple eventq simulation.
 //! The quantum value is the period length after which the queues
@@ -686,6 +733,15 @@ class EventManager
     void
     schedule(Event &event, Tick when)
     {
+        //    -----CHANGED----
+//               if(pkt->getAddr() == 960){
+    //           	std::cout << "In memory ctrl\n";
+//               	std::cout << "\t(&event)" << event.name() << "\t" << when << "\tin eventq- " << eventq->name() << "\n";
+//               	std::cout << "\t\t\tpkt_headerDelay " << pkt->headerDelay << "\tpayLoadDelay " << pkt->payloadDelay << "\n";
+//               	std::cout << "\t\tnextReqEvent " << nextReqEvent.name() << "\t" << nextReqEvent.when() << "\n";
+    //           	std::cout << "\t\tbacktendLatency " << backendLatency << "\n";
+//               }
+               //    -----CHANGED----
         eventq->schedule(&event, when);
     }
 
@@ -704,6 +760,7 @@ class EventManager
     void
     schedule(Event *event, Tick when)
     {
+//    	std::cout << "\t(*event)" << event->name() << "\t" << when  << "\tin eventq- " << eventq->name() << "\n";
         eventq->schedule(event, when);
     }
 
@@ -778,6 +835,153 @@ class EventWrapper : public Event
 
     const char *description() const { return "EventWrapped"; }
 };
+
+//---------CHANGED-----------
+
+//classes
+
+class coreStatus
+{
+public:
+	 Tick tick;
+	 int fetch_status;
+	 int fetch_overall_status;
+	 int decode_status;
+	 int decode_overall_status;
+	 int rename_status;
+	 int rename_overall_status;
+	 std::string rename_reason_to_block;
+	 int dispatch_iew_status;
+	 int exe_iew_status;
+	 int wb_iew_status;
+	 int iew_overall_status;
+	 int commit_status;
+	 int commit_overall_status;
+	 std::string commit_head_instruction;
+	 int l1_mshr_total;
+	 int l1_mshr_ready;
+	 int l2_mshr_total;
+	 int l2_mshr_ready;
+	 int l3_mshr_total;
+	 int l3_mshr_ready;
+};
+
+class coreStatusVector
+{
+public:
+	 Tick lastTick;
+	 int lastStatus;
+	 std::vector<coreStatus> vec;
+};
+
+
+class L3QStatus
+{
+public:
+	 Tick tick;
+	 std::string operationType;
+	 int groupT1;
+	 int groupT2;
+	 std::vector<int> requestCount;
+	 int groupO1;
+	 int groupO2;
+	 std::vector<int> requestOutSCount;
+	 int prioritizedCore;
+};
+
+class L3QStatusVector
+{
+	public:
+	 Tick lastTick;
+	 int lastStatus;
+	 std::vector<L3QStatus> vec;
+};
+
+class qLength
+{
+	public:
+	uint64_t cycle;
+	uint64_t readyTime;
+	uint64_t exitTime;
+	std::string cacheName;
+	bool visited;
+	//std::vector<PacketStageInfo> vec;
+};
+
+class CycleInfo
+{
+	public:
+	uint64_t pktId;
+	int masterId;
+	std::string stageName;
+	//std::vector<PacketStageInfo> vec;
+};
+
+class CycleVector
+{
+	public:
+	uint64_t cycle;
+	std::vector<CycleInfo> vec;
+};
+
+
+class PacketStageInfo
+ {
+	public:
+	uint64_t atTick;
+	std::string stageName;
+	std::string type;
+ };
+
+ class PacketInfo
+ {
+	public:
+	int masterId;
+	uint64_t arrivalTime;
+	uint64_t finishTime;
+	uint64_t pktAddr;
+	int l1Hit;
+	int l2Hit;
+	int l3Hit;
+	std::vector<PacketStageInfo> vec;
+ };
+
+ class PacketDelayPathInfo
+  {
+	 public:
+	 std::string stageName;
+	 uint64_t delay;
+  };
+
+ class PacketDelayInfo
+  {
+ 	 public:
+	 int masterId;
+	 uint64_t arrivalTime;
+	 uint64_t finishTime;
+	 uint64_t pktAddr;
+	 std::vector<PacketDelayPathInfo> vec;
+  };
+ class Record
+ {
+ public:
+	 uint64_t totalIcacheRequests = 0;
+	 uint64_t totalRequests = 0;
+	 uint64_t totalDelay = 0;
+	 uint64_t totalHitDelay = 0;
+	 uint64_t totalHit = 0;
+ };
+
+ class TotalStats
+ {
+ public:
+	 uint64_t numEntry;
+	 uint64_t delay;
+	 uint64_t avg;
+ };
+//---------CHANGED-----------
+
+
 #endif
 
 #endif // __SIM_EVENTQ_HH__

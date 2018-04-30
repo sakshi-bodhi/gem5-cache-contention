@@ -51,6 +51,7 @@
 #include "cpu/o3/fu_pool.hh"
 #include "cpu/o3/inst_queue.hh"
 #include "debug/IQ.hh"
+#include "debug/MYIQ.hh"
 #include "enums/OpClass.hh"
 #include "params/DerivO3CPU.hh"
 #include "sim/core.hh"
@@ -95,6 +96,8 @@ InstructionQueue<Impl>::InstructionQueue(O3CPU *cpu_ptr, IEW *iew_ptr,
 {
     assert(fuPool);
 
+//    std::cout << "IssueWidth: " << totalWidth << "\n";
+//    std::cout << "IQ size: " << numEntries << "\n";
     numThreads = params->numThreads;
 
     // Set the number of total physical registers
@@ -595,6 +598,17 @@ InstructionQueue<Impl>::insert(DynInstPtr &new_inst)
 
     ++iqInstsAdded;
 
+//    std::cout << "DUMP ------------dumpLists----------\n";
+//    dumpLists();
+//    std::cout << "DUMP ------------dumpInsts (IQ)----------\n";
+//    dumpInsts();
+
+//    std::cout << "-----IQ-----\n";
+//    std::cout << curTick() << "\tIQ size (instList) : " << instList[new_inst->threadNumber].size() << "\n";
+//    std::cout << "inst addr: " << new_inst->instAddr() << "\n";
+//    std::cout << "inst microPC: " << new_inst->microPC() << "\n";
+//    std::cout << "inst type: " << new_inst->getName() << "\n";
+
     count[new_inst->threadNumber]++;
 
     assert(freeEntries == (numEntries - countInsts()));
@@ -656,6 +670,7 @@ InstructionQueue<Impl>::getInstToExecute()
 {
     assert(!instsToExecute.empty());
     DynInstPtr inst = instsToExecute.front();
+//    std::cout << "Instruction to execute: " << inst << "\n" ;
     instsToExecute.pop_front();
     if (inst->isFloating()){
         fpInstQueueReads++;
@@ -849,6 +864,8 @@ InstructionQueue<Impl>::scheduleReadyInsts()
                     tid, issuing_inst->pcState(),
                     issuing_inst->seqNum);
 
+//            std::cout << curTick() << "\tDUMP issuing instruction " << issuing_inst->instAddr() << "\tinst type: " << issuing_inst->getName() << "\tseq no. " << issuing_inst->seqNum << "\n";
+
             readyInsts[op_class].pop();
 
             if (!readyInsts[op_class].empty()) {
@@ -961,6 +978,9 @@ InstructionQueue<Impl>::wakeDependents(DynInstPtr &completed_inst)
 
     assert(!completed_inst->isSquashed());
 
+    DPRINTF(MYIQ, "completed instruction: [sn:%lli] \t PC %s \n", completed_inst->seqNum, completed_inst->pcState());
+//    std::cout << "MOV DUMP completed instruction: " << completed_inst->seqNum << "\t PC: " << completed_inst->pcState() << "\n";
+
     // Tell the memory dependence unit to wake any dependents on this
     // instruction if it is a memory instruction.  Also complete the memory
     // instruction at this point since we know it executed without issues.
@@ -1001,6 +1021,7 @@ InstructionQueue<Impl>::wakeDependents(DynInstPtr &completed_inst)
         while (dep_inst) {
             DPRINTF(IQ, "Waking up a dependent instruction, [sn:%lli] "
                     "PC %s.\n", dep_inst->seqNum, dep_inst->pcState());
+//            std::cout << "MOV DUMP Waking (sn:" << dep_inst->seqNum << ") PC: " << dep_inst->pcState() << "\n";
 
             // Might want to give more information to the instruction
             // so that it knows which of its source registers is
@@ -1285,6 +1306,9 @@ InstructionQueue<Impl>::doSquash(ThreadID tid)
     }
 }
 
+std::map<std::string, uint64_t> iMap;
+
+
 template <class Impl>
 bool
 InstructionQueue<Impl>::addToDependents(DynInstPtr &new_inst)
@@ -1294,14 +1318,57 @@ InstructionQueue<Impl>::addToDependents(DynInstPtr &new_inst)
     int8_t total_src_regs = new_inst->numSrcRegs();
     bool return_val = false;
 
+//    std::cout <<  "IQ MOV Instruction is: " << new_inst->staticInst->disassemble(new_inst->pcState().instAddr()) <<"\n";
+//    for (int src_reg_idx = 0; src_reg_idx < total_src_regs; src_reg_idx++)
+//    {
+//    	std::cout << "IQ MOV inst addr: " << new_inst->pcState() << "\t seq no. " << new_inst->seqNum << "\t at src register index " << src_reg_idx << "\t logical reg " << new_inst->srcRegIdx(src_reg_idx) << "\t register is " << new_inst->renamedSrcRegIdx(src_reg_idx) << "\n";
+//    }
+//    int8_t total_dest_regs = new_inst->numDestRegs();
+//    for (int dest_reg_idx = 0; dest_reg_idx < total_dest_regs; dest_reg_idx++)
+//    {
+//    	std::cout << "IQ MOV inst addr: " << new_inst->pcState() << "\t at dest register index " << dest_reg_idx << "\t logical reg " << new_inst->destRegIdx(dest_reg_idx) << "\t register is " << new_inst->renamedDestRegIdx(dest_reg_idx) << "\n";
+//    }
+
+    if(iMap.find(new_inst->getName()) != iMap.end()) {
+    	iMap[new_inst->getName()]++;
+    }
+    else {
+    	iMap[new_inst->getName()] = 1;
+//    	std::cout << "IQ MOV iMap size " << iMap.size() << "\n";
+//    	std::cout << "IQ MOV INST MAP inst name: " << new_inst->getName() << "\n";
+//    	std::cout <<  "IQ MOV Instruction is: " << new_inst->staticInst->disassemble(new_inst->pcState().instAddr()) <<"\n";
+
+    	int8_t total_dest_regs = new_inst->numDestRegs();
+    	for (int dest_reg_idx = 0; dest_reg_idx < total_dest_regs; dest_reg_idx++)
+	    {
+//	    	std::cout << "IQ MOV at dest register index " << dest_reg_idx << "\t logical reg " << new_inst->destRegIdx(dest_reg_idx) << "\t register is " << new_inst->renamedDestRegIdx(dest_reg_idx) << "\n";
+	    }
+
+    	for (int src_reg_idx = 0; src_reg_idx < total_src_regs; src_reg_idx++)
+    	{
+//    		std::cout << "IQ MOV at src register index " << src_reg_idx << "\t logical reg " << new_inst->srcRegIdx(src_reg_idx) << "\t register is " << new_inst->renamedSrcRegIdx(src_reg_idx) << "\n";
+    	}
+
+//    	std::cout << "\n";
+    }
+
     for (int src_reg_idx = 0;
          src_reg_idx < total_src_regs;
          src_reg_idx++)
     {
+//    	std::cout << "IQ MOV inst addr: " << new_inst->pcState() << "\t at src register index " << src_reg_idx << "\t register is " << new_inst->renamedSrcRegIdx(src_reg_idx) << "\n";
         // Only add it to the dependency graph if it's not ready.
         if (!new_inst->isReadySrcRegIdx(src_reg_idx)) {
             PhysRegIndex src_reg = new_inst->renamedSrcRegIdx(src_reg_idx);
+            if(!new_inst->getName().compare("mov") && (src_reg_idx == 0||src_reg_idx == 2)) {
+            	new_inst->markSrcRegReady(src_reg_idx);
+            	continue;
+            }
 
+//            if(!new_inst->getName().compare("lea") && (src_reg_idx == 2)) {
+//            	new_inst->markSrcRegReady(src_reg_idx);
+//            	continue;
+//            }
             // Check the IQ's scoreboard to make sure the register
             // hasn't become ready while the instruction was in flight
             // between stages.  Only if it really isn't ready should
@@ -1313,7 +1380,15 @@ InstructionQueue<Impl>::addToDependents(DynInstPtr &new_inst)
                         "is being added to the dependency chain.\n",
                         new_inst->pcState(), src_reg);
 
-                dependGraph.insert(src_reg, new_inst);
+//                if(!new_inst->getName().compare("mov")) {
+//                	std::cout << "IQ MOV adding to dependency graph- inst addr: " << new_inst->pcState() << "\t for src register index " << src_reg_idx << "\n";
+//                	std::cout << "MOV inst addr: " << new_inst->instAddr() << "\n";
+//                	std::cout << "IQ MOV inst microPC: " << new_inst->microPC() << "\n";
+//                	std::cout << "IQ MOV inst type: " << new_inst->getName() << "\n";
+//                	std::cout <<  "IQ MOV Instruction is: " << new_inst->staticInst->disassemble(new_inst->pcState().instAddr()) <<"\n";
+
+                	dependGraph.insert(src_reg, new_inst);
+
 
                 // Change the return value to indicate that something
                 // was added to the dependency graph.
@@ -1392,6 +1467,8 @@ InstructionQueue<Impl>::addIfReady(DynInstPtr &inst)
         DPRINTF(IQ, "Instruction is ready to issue, putting it onto "
                 "the ready list, PC %s opclass:%i [sn:%lli].\n",
                 inst->pcState(), op_class, inst->seqNum);
+
+//        std::cout << "DUMP op_class where this instruction is added: " << op_class << "\n";
 
         readyInsts[op_class].push(inst);
 
@@ -1495,6 +1572,7 @@ InstructionQueue<Impl>::dumpInsts()
         int valid_num = 0;
         ListIt inst_list_it = instList[tid].begin();
 
+//        std::cout << "DUMP Instruction list size: " << instList[tid].size() << "\n";
         while (inst_list_it != instList[tid].end()) {
             cprintf("Instruction:%i\n", num);
             if (!(*inst_list_it)->isSquashed()) {

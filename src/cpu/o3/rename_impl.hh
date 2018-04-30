@@ -54,6 +54,8 @@
 #include "cpu/reg_class.hh"
 #include "debug/Activity.hh"
 #include "debug/Rename.hh"
+#include "debug/MYRENAME.hh"
+#include "debug/CpuStatus.hh"
 #include "debug/O3PipeView.hh"
 #include "params/DerivO3CPU.hh"
 
@@ -443,6 +445,8 @@ DefaultRename<Impl>::tick()
         assert(instsInProgress[tid] >=0);
     }
 
+//    dumpHistory();
+
 }
 
 template<class Impl>
@@ -456,8 +460,23 @@ DefaultRename<Impl>::rename(bool &status_change, ThreadID tid)
     //     continue trying to empty skid buffer
     //     check if stall conditions have passed
 
+
+    if(renameStatus[tid] == Idle) {
+        DPRINTF(CpuStatus," rename: 2: (idle): overall_fetch_status: %d\n", _status);
+        recordStatus(curTick(), name(), "rename", 2, _status, "none");
+    }
+    else if (renameStatus[tid] == Blocked) {
+    	DPRINTF(CpuStatus," rename: 1: (blocked): overall_fetch_status: %d\n", _status);
+    	recordStatus(curTick(), name(), "rename", 1, _status, "none");
+    }
+    else {
+    	DPRINTF(CpuStatus," rename: 0: (running): overall_fetch_status: %d\n", _status);
+    	recordStatus(curTick(), name(), "rename", 0, _status, "none");
+    }
+
     if (renameStatus[tid] == Blocked) {
         ++renameBlockCycles;
+//        DPRINTF(CpuStatus," Rename is blocked (blocked)\n");
     } else if (renameStatus[tid] == Squashing) {
         ++renameSquashCycles;
     } else if (renameStatus[tid] == SerializeStall) {
@@ -467,11 +486,13 @@ DefaultRename<Impl>::rename(bool &status_change, ThreadID tid)
         // this cycle.  Tell the previous stages to block.
         if (resumeSerialize) {
             resumeSerialize = false;
+//            std::cout << "MYRENAME 2\n";
             block(tid);
             toDecode->renameUnblock[tid] = false;
         }
     } else if (renameStatus[tid] == Unblocking) {
         if (resumeUnblocking) {
+//        	std::cout << "MYRENAME 3\n";
             block(tid);
             resumeUnblocking = false;
             toDecode->renameUnblock[tid] = false;
@@ -513,6 +534,11 @@ DefaultRename<Impl>::renameInsts(ThreadID tid)
     if (insts_available == 0) {
         DPRINTF(Rename, "[tid:%u]: Nothing to do, breaking out early.\n",
                 tid);
+
+        DPRINTF(MYRENAME,"Status: 5: No instruction available\n");
+        DPRINTF(CpuStatus," rename: 2: (idle-no inst)\n");
+    	recordStatus(curTick(), name(), "rename", 2, _status, "no-inst");
+//        DPRINTF(MYIEW,"Issue: Status: 1 \t IQ has become full (IQ:LQ:SQ) \t %d\t%d\t%d \n", instQueue.getCount(tid),ldstQueue.numFreeLoadEntries(),ldstQueue.numFreeLoadEntries());
         // Should I change status to idle?
         ++renameIdleCycles;
         return;
@@ -549,6 +575,9 @@ DefaultRename<Impl>::renameInsts(ThreadID tid)
 
         blockThisCycle = true;
 
+        DPRINTF(MYRENAME,"Status: %s: (ROB:IQ) %d\t%d \n", source, free_rob_entries, free_iq_entries);
+
+//        std::cout << "MYRENAME 5\n";
         block(tid);
 
         incrFullStat(source);
@@ -563,6 +592,8 @@ DefaultRename<Impl>::renameInsts(ThreadID tid)
         insts_available = min_free_entries;
 
         blockThisCycle = true;
+
+        DPRINTF(MYRENAME,"Status: %s: (ROB:IQ) %d\t%d \n", source, free_rob_entries, free_iq_entries);
 
         incrFullStat(source);
     }
@@ -596,7 +627,9 @@ DefaultRename<Impl>::renameInsts(ThreadID tid)
 
         inst = insts_to_rename.front();
 
-        //For all kind of instructions, check ROB and IQ first
+//       	DPRINTF(MYRENAME,"[sn:%lli]: PC: %s \t %s\n",inst->seqNum, inst->pcState(), inst->staticInst->disassemble(inst->pcState().instAddr()));
+
+       	//For all kind of instructions, check ROB and IQ first
         //For load instruction, check LQ size and take into account the inflight loads
         //For store instruction, check SQ size and take into account the inflight stores
 
@@ -604,6 +637,7 @@ DefaultRename<Impl>::renameInsts(ThreadID tid)
             if (calcFreeLQEntries(tid) <= 0) {
                 DPRINTF(Rename, "[tid:%u]: Cannot rename due to no free LQ\n");
                 source = LQ;
+                DPRINTF(MYRENAME,"Status: %s: (LQ:SQ) %d\t%d \n", source, calcFreeLQEntries(tid) , calcFreeSQEntries(tid) );
                 incrFullStat(source);
                 break;
             }
@@ -613,6 +647,7 @@ DefaultRename<Impl>::renameInsts(ThreadID tid)
             if (calcFreeSQEntries(tid) <= 0) {
                 DPRINTF(Rename, "[tid:%u]: Cannot rename due to no free SQ\n");
                 source = SQ;
+                DPRINTF(MYRENAME,"Status: %s: (LQ:SQ) %d\t%d \n", source, calcFreeLQEntries(tid) , calcFreeSQEntries(tid) );
                 incrFullStat(source);
                 break;
             }
@@ -649,11 +684,14 @@ DefaultRename<Impl>::renameInsts(ThreadID tid)
             DPRINTF(Rename, "Blocking due to lack of free "
                     "physical registers to rename to.\n");
             blockThisCycle = true;
+            DPRINTF(MYRENAME,"Status: 4: source %s\n", source);
             insts_to_rename.push_front(inst);
             ++renameFullRegistersEvents;
 
             break;
         }
+
+        DPRINTF(MYRENAME,"Status: ACTIVE\n");
 
         // Handle serializeAfter/serializeBefore instructions.
         // serializeAfter marks the next instruction as serializeBefore.
@@ -737,6 +775,7 @@ DefaultRename<Impl>::renameInsts(ThreadID tid)
     }
 
     if (blockThisCycle) {
+//    	std::cout << "MYRENAME 4\n";
         block(tid);
         toDecode->renameUnblock[tid] = false;
     }
@@ -854,6 +893,10 @@ bool
 DefaultRename<Impl>::block(ThreadID tid)
 {
     DPRINTF(Rename, "[tid:%u]: Blocking.\n", tid);
+
+//    if(curTick() == 30032500){
+//    	std::cout << "MYRENAME block()\n";
+//    }
 
     // Add the current inputs onto the skid buffer, so they can be
     // reprocessed when this stage unblocks.
@@ -1232,15 +1275,27 @@ DefaultRename<Impl>::checkStall(ThreadID tid)
         ret_val = true;
     } else if (calcFreeROBEntries(tid) <= 0) {
         DPRINTF(Rename,"[tid:%i]: Stall: ROB has 0 free entries.\n", tid);
+        DPRINTF(MYRENAME,"Status: 0: ROB full (ROB:IQ) %d\t%d \n", calcFreeROBEntries(tid), calcFreeIQEntries(tid));
+        DPRINTF(CpuStatus," rename ROB: 1: (ROB full,rename is blocked)\n");
+    	recordStatus(curTick(), name(), "rename", 1, _status, "ROB full");
         ret_val = true;
     } else if (calcFreeIQEntries(tid) <= 0) {
         DPRINTF(Rename,"[tid:%i]: Stall: IQ has 0 free entries.\n", tid);
+        DPRINTF(MYRENAME,"Status: 1: IQ full (ROB:IQ) %d\t%d \n", calcFreeROBEntries(tid), calcFreeIQEntries(tid));
+        DPRINTF(CpuStatus," rename IQ: 1: (IQ full,rename is blocked)\n");
+    	recordStatus(curTick(), name(), "rename", 1, _status, "IQ full");
         ret_val = true;
     } else if (calcFreeLQEntries(tid) <= 0 && calcFreeSQEntries(tid) <= 0) {
         DPRINTF(Rename,"[tid:%i]: Stall: LSQ has 0 free entries.\n", tid);
+        DPRINTF(MYRENAME,"Status: 2: LSQ full (LQ:SQ) %d\t%d \n", calcFreeLQEntries(tid), calcFreeSQEntries(tid));
+        DPRINTF(CpuStatus," rename LSQ: 1: (LSQ full,rename is blocked)\n");
+    	recordStatus(curTick(), name(), "rename", 1, _status, "LSQ full");
         ret_val = true;
     } else if (renameMap[tid]->numFreeEntries() <= 0) {
         DPRINTF(Rename,"[tid:%i]: Stall: RenameMap has 0 free entries.\n", tid);
+        DPRINTF(MYRENAME,"Status: 4: RenameMap has %d free entries\n", renameMap[tid]->numFreeEntries());
+        DPRINTF(CpuStatus," rename RenameMap: 1: (RenameMap full,rename is blocked)\n");
+    	recordStatus(curTick(), name(), "rename", 1, _status, "Rename Map full");
         ret_val = true;
     } else if (renameStatus[tid] == SerializeStall &&
                (!emptyROB[tid] || instsInProgress[tid])) {
@@ -1310,6 +1365,7 @@ DefaultRename<Impl>::checkSignalsAndUpdate(ThreadID tid)
     }
 
     if (checkStall(tid)) {
+//    	std::cout << "MYRENAME 1\n";
         return block(tid);
     }
 
@@ -1429,6 +1485,8 @@ DefaultRename<Impl>::dumpHistory()
     for (ThreadID tid = 0; tid < numThreads; tid++) {
 
         buf_it = historyBuffer[tid].begin();
+
+//        std::cout<<"DUMP HISTORY\n";
 
         while (buf_it != historyBuffer[tid].end()) {
             cprintf("Seq num: %i\nArch reg: %i New phys reg: %i Old phys "

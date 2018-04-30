@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2004-2006 The Regents of The University of Michigan
+ * Copyright (c) 2000-2005 The Regents of The University of Michigan
+ * Copyright (c) 2013 Advanced Micro Devices, Inc.
+ * Copyright (c) 2013 Mark D. Hill and David A. Wood
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,48 +27,35 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Authors: Kevin Lim
+ * Authors: Steve Reinhardt
+ *          Nathan Binkert
  */
 
-#include "cpu/o3/deriv.hh"
+/* @file
+ * EventQueue interfaces
+ */
 
+#ifndef __SIM_MYPRIORITY_HH__
+#define __SIM_MYPRIORITY_HH__
+
+#include <algorithm>
+#include <cassert>
+#include <climits>
+#include <iosfwd>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <map>
 
-#include "params/DerivO3CPU.hh"
 
-DerivO3CPU *
-DerivO3CPUParams::create()
-{
-	std::cout << "create thread \n";
-    ThreadID actual_num_threads;
-    if (FullSystem) {
-        // Full-system only supports a single thread for the moment.
-        actual_num_threads = 1;
-    } else {
-        if (workload.size() > numThreads) {
-            fatal("Workload Size (%i) > Max Supported Threads (%i) on This CPU",
-                  workload.size(), numThreads);
-        } else if (workload.size() == 0) {
-            fatal("Must specify at least one workload!");
-        }
+#include "base/flags.hh"
+#include "base/types.hh"
+#include "debug/MYSTATS.hh"
+#include "sim/serialize.hh"
 
-        // In non-full-system mode, we infer the number of threads from
-        // the workload if it's not explicitly specified.
-        actual_num_threads =
-            (numThreads >= workload.size()) ? numThreads : workload.size();
-    }
 
-    numThreads = actual_num_threads;
-	std::cout << "numThread " << numThreads << "\n";
+extern uint64_t getPriority();
+extern void setPriority(uint64_t masterId, int pri);
+extern void retryingCore(uint64_t portId);
 
-    // Default smtFetchPolicy to "RoundRobin", if necessary.
-    std::string round_robin_policy = "RoundRobin";
-    std::string single_thread = "SingleThread";
-
-    if (actual_num_threads > 1 && single_thread.compare(smtFetchPolicy) == 0)
-        smtFetchPolicy = round_robin_policy;
-    else
-        smtFetchPolicy = smtFetchPolicy;
-
-    return new DerivO3CPU(this);
-}
+#endif // __SIM_MYPRIORITY_HH__

@@ -592,6 +592,40 @@ LSQUnit<Impl>::read(Request *req, Request *sreqLow, Request *sreqHigh,
             load_idx, store_idx, storeHead, req->getPaddr(),
             sreqLow ? " split" : "");
 
+
+//  	cprintf("\tReading from Addr:%#x\n", req->getPaddr());
+//    dumpInsts();
+    //------CHANGED----
+//    cprintf("Load store queue: Dumping instructions.\n");
+//       cprintf("Load queue size: %i\n", loads);
+//       cprintf("Load queue: ");
+//
+//       int load_indx = loadHead;
+//
+//       while (load_indx != loadTail && loadQueue[load_indx]) {
+//           const DynInstPtr &inst(loadQueue[load_indx]);
+//           cprintf("%s.[sn:%i] ", inst->pcState(), inst->seqNum);
+//           std::cout << "Address is " <<
+//           incrLdIdx(load_indx);
+//       }
+//       cprintf("\n");
+//
+//       cprintf("Store queue size: %i\n", stores);
+//       cprintf("Store queue: ");
+//
+//       int store_indx = storeHead;
+//
+//       while (store_indx != storeTail && storeQueue[store_indx].inst) {
+//           const DynInstPtr &inst(storeQueue[store_indx].inst);
+//           cprintf("%s.[sn:%i] ", inst->pcState(), inst->seqNum);
+//
+//           incrStIdx(store_indx);
+//       }
+//
+//       cprintf("\n");
+
+       //----CHANAGED----
+
     if (req->isLLSC()) {
         assert(!sreqLow);
         // Disable recording the result temporarily.  Writing to misc
@@ -797,6 +831,11 @@ LSQUnit<Impl>::read(Request *req, Request *sreqLow, Request *sreqHigh,
         state->outstanding = 2;
         state->mainPkt = data_pkt;
     }
+
+    //-----------CHANGED----------
+//    std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << data_pkt->req->rid << "\t" << data_pkt->getAddr() << "\t" << data_pkt->req->masterId() << "\t with packet's entry time " << data_pkt->req->entryTime << "\n";
+    initDelayPath(data_pkt->req->rid, data_pkt->getAddr(), data_pkt->req->masterId(), data_pkt->req->entryTime);
+    //-----------CHANGED----------
 
     // For now, load throughput is constrained by the number of
     // load FUs only, and loads do not consume a cache port (only

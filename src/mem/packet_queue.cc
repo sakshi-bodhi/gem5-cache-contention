@@ -194,6 +194,8 @@ PacketQueue::sendDeferredPacket()
     assert(!waitingOnRetry);
     assert(deferredPacketReady());
 
+    std::cout << curTick() << "\tTrace " << name() << "\tat sendDefferedPacket from respQueue (PktQueue)\n";
+
     DeferredPacket dp = transmitList.front();
 
     // take the packet of the list before sending it, as sending of

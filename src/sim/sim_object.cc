@@ -189,3 +189,20 @@ SimObject::find(const char *name)
 
     return NULL;
 }
+
+// (gdb) set print object
+//(gdb) call SimObject::find(" system.physmem.cache0.cache0.cpu")
+//$4 = (MemTest *) 0xf1ac60
+//(gdb) p (MemTest*)$4
+//$5 = (MemTest *) 0xf1ac60
+//(gdb) call $5->printAddr(0x107f40)
+//
+//system.physmem.cache0.cache0
+//  MSHRs
+//    [107f40:107f7f] Fill   state:
+//      Targets:
+//        cpu: [107f40:107f40] ReadReq
+//system.physmem.cache1.cache1
+//  blk VEM
+//system.physmem
+//  0xd0

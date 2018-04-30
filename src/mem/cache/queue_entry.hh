@@ -66,15 +66,23 @@ class QueueEntry : public Packet::SenderState
     template <class Entry>
     friend class Queue;
 
-  protected:
 
+public:
+    //--------CHANGED-------
     /** Tick when ready to issue */
-    Tick readyTime;
+    Tick readyTime;	// previously it was in protected mode
+    //--------CHANGED-------
 
+protected:
     /** True if the entry is uncacheable */
     bool _isUncacheable;
 
   public:
+
+    //--------CHANGED-------
+           Tick arrivalTime;
+       //--------CHANGED-------
+
 
     /** True if the entry has been sent downstream. */
     bool inService;

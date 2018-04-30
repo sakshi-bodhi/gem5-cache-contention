@@ -240,6 +240,12 @@ class Request
         ARG_SEGMENT            = 0x00000800,
     };
 
+
+    //--------CHANGED--------
+    uint64_t rid;	// unique request id
+    //--------CHANGED--------
+
+
   private:
     typedef uint8_t PrivateFlagsType;
     typedef ::Flags<PrivateFlagsType> PrivateFlags;
@@ -275,6 +281,7 @@ class Request
     void
     setPhys(Addr paddr, unsigned size, Flags flags, MasterID mid, Tick time)
     {
+
         _paddr = paddr;
         _size = size;
         _time = time;
@@ -284,9 +291,12 @@ class Request
         privateFlags.clear(~STICKY_PRIVATE_FLAGS);
         privateFlags.set(VALID_PADDR|VALID_SIZE);
         depth = 0;
+        missedLLC = false;
         accessDelta = 0;
+        entryTime = _time;
         //translateDelta = 0;
     }
+
 
     /**
      * The physical address of the request. Valid only if validPaddr
@@ -352,6 +362,22 @@ class Request
 
   public:
 
+    //---------CHANGED-----------
+    void setRid() {
+    	rid = getRequestId();
+//    	if(rid == 6907713) {
+//    		std::cout << "Icache_acces is 0 for this!!";
+//    	}
+    }
+
+    uint64_t getseqNum() {
+    	uint64_t sn;
+    	sn = _reqInstSeqNum;
+    	return sn;
+    }
+    //---------CHANGED-----------
+
+
     /**
      * Minimal constructor. No fields are initialized. (Note that
      *  _flags and privateFlags are cleared by Flags default
@@ -361,18 +387,21 @@ class Request
         : _paddr(0), _size(0), _masterId(invldMasterId), _time(0),
           _taskId(ContextSwitchTaskId::Unknown), _asid(0), _vaddr(0),
           _extraData(0), _contextId(0), _pc(0),
-          _reqInstSeqNum(0), atomicOpFunctor(nullptr), translateDelta(0),
+          _reqInstSeqNum(0), atomicOpFunctor(nullptr), missedLLC(false), translateDelta(0),
           accessDelta(0), depth(0)
-    {}
+    {
+    	setRid();
+    }
 
     Request(Addr paddr, unsigned size, Flags flags, MasterID mid,
             InstSeqNum seq_num, ContextID cid)
         : _paddr(0), _size(0), _masterId(invldMasterId), _time(0),
           _taskId(ContextSwitchTaskId::Unknown), _asid(0), _vaddr(0),
           _extraData(0), _contextId(0), _pc(0),
-          _reqInstSeqNum(seq_num), atomicOpFunctor(nullptr), translateDelta(0),
+          _reqInstSeqNum(seq_num), atomicOpFunctor(nullptr), missedLLC(false), translateDelta(0),
           accessDelta(0), depth(0)
     {
+    	setRid();
         setPhys(paddr, size, flags, mid, curTick());
         setContext(cid);
         privateFlags.set(VALID_INST_SEQ_NUM);
@@ -387,9 +416,10 @@ class Request
         : _paddr(0), _size(0), _masterId(invldMasterId), _time(0),
           _taskId(ContextSwitchTaskId::Unknown), _asid(0), _vaddr(0),
           _extraData(0), _contextId(0), _pc(0),
-          _reqInstSeqNum(0), atomicOpFunctor(nullptr), translateDelta(0),
+          _reqInstSeqNum(0), atomicOpFunctor(nullptr), missedLLC(false), translateDelta(0),
           accessDelta(0), depth(0)
     {
+    	setRid();
         setPhys(paddr, size, flags, mid, curTick());
     }
 
@@ -397,9 +427,10 @@ class Request
         : _paddr(0), _size(0), _masterId(invldMasterId), _time(0),
           _taskId(ContextSwitchTaskId::Unknown), _asid(0), _vaddr(0),
           _extraData(0), _contextId(0), _pc(0),
-          _reqInstSeqNum(0), atomicOpFunctor(nullptr), translateDelta(0),
+          _reqInstSeqNum(0), atomicOpFunctor(nullptr), missedLLC(false), translateDelta(0),
           accessDelta(0), depth(0)
     {
+    	setRid();
         setPhys(paddr, size, flags, mid, time);
     }
 
@@ -408,9 +439,10 @@ class Request
         : _paddr(0), _size(0), _masterId(invldMasterId), _time(0),
           _taskId(ContextSwitchTaskId::Unknown), _asid(0), _vaddr(0),
           _extraData(0), _contextId(0), _pc(pc),
-          _reqInstSeqNum(0), atomicOpFunctor(nullptr), translateDelta(0),
+          _reqInstSeqNum(0), atomicOpFunctor(nullptr), missedLLC(false), translateDelta(0),
           accessDelta(0), depth(0)
     {
+    	setRid();
         setPhys(paddr, size, flags, mid, time);
         privateFlags.set(VALID_PC);
     }
@@ -420,17 +452,20 @@ class Request
         : _paddr(0), _size(0), _masterId(invldMasterId), _time(0),
           _taskId(ContextSwitchTaskId::Unknown), _asid(0), _vaddr(0),
           _extraData(0), _contextId(0), _pc(0),
-          _reqInstSeqNum(0), atomicOpFunctor(nullptr), translateDelta(0),
+          _reqInstSeqNum(0), atomicOpFunctor(nullptr), missedLLC(false), translateDelta(0),
           accessDelta(0), depth(0)
     {
+    	setRid();
+//   	   std::cout << "LOADREQ vaddr (I/D) " << vaddr << " Req id " << rid << "\n";
         setVirt(asid, vaddr, size, flags, mid, pc);
         setContext(cid);
     }
 
     Request(int asid, Addr vaddr, unsigned size, Flags flags, MasterID mid,
             Addr pc, ContextID cid, AtomicOpFunctor *atomic_op)
-        : atomicOpFunctor(atomic_op)
+        : atomicOpFunctor(atomic_op), missedLLC(false)
     {
+    	setRid();
         setVirt(asid, vaddr, size, flags, mid, pc);
         setContext(cid);
     }
@@ -460,6 +495,7 @@ class Request
     setVirt(int asid, Addr vaddr, unsigned size, Flags flags, MasterID mid,
             Addr pc)
     {
+    	missedLLC = false;
         _asid = asid;
         _vaddr = vaddr;
         _size = size;
@@ -474,6 +510,7 @@ class Request
         depth = 0;
         accessDelta = 0;
         translateDelta = 0;
+        entryTime = _time;
     }
 
     /**
@@ -522,6 +559,11 @@ class Request
         return _paddr;
     }
 
+    //--------CHANGED--------------
+       	bool missedLLC;
+     //--------CHANGED--------------
+
+
     /**
      * Time for the TLB/table walker to successfully translate this request.
      */
@@ -538,6 +580,11 @@ class Request
      * (e.g. 0 = L1; 1 = L2).
      */
     mutable int depth;
+
+    //---------CHANGED---------
+       Tick entryTime = 0;		//arrival time of the request
+       //---------CHANGED---------
+
 
     /**
      *  Accessor for size.
@@ -620,6 +667,20 @@ class Request
     }
 
     /** Accesssor for the requestor id. */
+
+    //---------CHANGED----------
+    void setmissedLLC()
+    {
+    	missedLLC = true;
+    }
+
+    bool getmissedLLC()
+    {
+    	return missedLLC;
+    }
+
+    //---------CHANGED----------
+
     MasterID
     masterId() const
     {

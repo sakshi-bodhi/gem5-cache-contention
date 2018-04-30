@@ -28,6 +28,7 @@
 # Authors: Nathan Binkert
 #          Rick Strong
 
+import pdb
 from m5.SimObject import SimObject
 from m5.params import *
 from m5.proxy import *

@@ -66,6 +66,8 @@
 #include "debug/Drain.hh"
 #include "debug/Fetch.hh"
 #include "debug/O3PipeView.hh"
+#include "debug/CpuStatus.hh"
+
 #include "mem/packet.hh"
 #include "params/DerivO3CPU.hh"
 #include "sim/byteswap.hh"
@@ -390,6 +392,8 @@ DefaultFetch<Impl>::processCacheCompletion(PacketPtr pkt)
         ++fetchIcacheSquashes;
         delete pkt->req;
         delete pkt;
+//        std::cout << "process cache completion (if)\n";
+//        std::cout << curTick() << "\t" << pkt->getAddr() << "\t" << pkt->req << "\t" << pkt->req->getAccessLatency() << "\t" << pkt->req->getAccessDepth() << "\n" ;
         return;
     }
 
@@ -413,7 +417,25 @@ DefaultFetch<Impl>::processCacheCompletion(PacketPtr pkt)
     }
 
     pkt->req->setAccessLatency();
+
+    //-----CHANGED----
+    if(pkt->req->getmissedLLC())
+    {
+//    	std::cout << "missedLLC is true for the packet below \n";
+//    	pkt->req->reachedLLC += 1;
+//    	pkt->req->coreToLLCDelay += pkt->req->getAccessLatency();
+    }
+//    std::cout << "process cache completion\n";
+//    std::cout << curTick() << "\t" << pkt->getAddr() << "\t" << pkt->req << "\t" << pkt->req->getAccessLatency() << "\t" << pkt->req->getAccessDepth() << "\n" ;
+    //-----CHANGED----
+
     cpu->ppInstAccessComplete->notify(pkt);
+
+    //-----CHANGED----
+//    std::cout << "delay_path \tStage13 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\t with packet's finish time " << pkt->req->getAccessLatency() << "\n";
+    addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "Resp", true, 2);
+    //-----CHANGED----
+
     // Reset the mem req to NULL.
     delete pkt->req;
     delete pkt;
@@ -594,10 +616,16 @@ DefaultFetch<Impl>::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
 {
     Fault fault = NoFault;
 
+    //-----CHANGED----
+//       std::cout << "fetchCacheLine(): vaddr=" << std::hex << vaddr << "\t thread id=" << tid << "\t pc=" << pc << "\n";
+       //std::cout << "fetchCacheLine(): eventq head tick= " << eventq->getHead()->when() << "\n";
+    //-----CHANGED----
+
     assert(!cpu->switchedOut());
 
     // @todo: not sure if these should block translation.
     //AlphaDep
+   // cout << "fetch_impl.hh <= ";
     if (cacheBlocked) {
         DPRINTF(Fetch, "[tid:%i] Can't fetch cache line, cache blocked\n",
                 tid);
@@ -626,9 +654,18 @@ DefaultFetch<Impl>::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
                     Request::INST_FETCH, cpu->instMasterId(), pc,
                     cpu->thread[tid]->contextId());
 
+//    std::cout << "Inst addr: " << pc << "\n";
+//    std::cout<< "\nRequest id: " << mem_req->rid << "\n";
     mem_req->taskId(cpu->taskId());
 
     memReq[tid] = mem_req;
+
+    //-----CHANGED----
+//           std::cout << "fetchCacheLine(): mem_req=" << mem_req << "\n";
+//    std::cout << "delay_path \tStage2 \t"  << curTick() << "\t" << mem_req->masterId() << "\n";
+//    addToDelayPath(0000, 2, curTick(), mem_req->masterId(), "name", 1234, mem_req->masterId(), curTick());
+
+    //-----CHANGED----
 
     // Initiate translation of the icache block
     fetchStatus[tid] = ItlbWait;
@@ -684,9 +721,30 @@ DefaultFetch<Impl>::finishTranslation(const Fault &fault, RequestPtr mem_req)
 
         fetchedCacheLines++;
 
+        //-----CHANGED----
+
+//        std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << name() << "\t" << data_pkt->req->rid << "\t" << data_pkt->getAddr() << "\t" << data_pkt->req->masterId() << "\t with packet's entry time " << data_pkt->req->entryTime << "\n";
+        initDelayPath(data_pkt->req->rid, data_pkt->getAddr(), data_pkt->req->masterId(), data_pkt->req->entryTime);
+
+//        int master = mem_req->masterId();
+//        std::cout << "master " << master << "\n";
+          //         std::cout << "finishTranslation(): mem_req (paddr)=" << mem_req->getPaddr() << "\n";
+//        std::cout << "delay_path \tStage3 \t" << curTick() << "\t" << mem_req->masterId() << "\t" << data_pkt->getAddr() << "\t" << mem_req->getPaddr() << "\t" << mem_req->getVaddr() << "\n";
+//        addToDelayPath(data_pkt->getAddr(), 3, curTick(), data_pkt->req->masterId(), "fetch_start", data_pkt->req->getPaddr(), data_pkt->req->masterId(), curTick());
+
+            //-----CHANGED----
+
         // Access the cache.
         if (!cpu->getInstPort().sendTimingReq(data_pkt)) {
-            assert(retryPkt == NULL);
+
+        	//-----CHANGED----
+        	if(data_pkt->getAddr() == 960){
+//        		std::cout << "PC " << mem_req->getPC()  << "\t data_pkt_address " << data_pkt->getAddr() << "\n";
+//        		std::cout << curTick() << "\tIcache wait retry ::  in finishTranslation() " << "\n";
+        	}
+        	//-----CHANGED----
+
+        	assert(retryPkt == NULL);
             assert(retryTid == InvalidThreadID);
             DPRINTF(Fetch, "[tid:%i] Out of MSHRs!\n", tid);
 
@@ -695,6 +753,15 @@ DefaultFetch<Impl>::finishTranslation(const Fault &fault, RequestPtr mem_req)
             retryTid = tid;
             cacheBlocked = true;
         } else {
+
+        	//-----CHANGED----
+        	if(data_pkt->getAddr() == 960){
+//        		std::cout << "PC " << mem_req->getPC() << "\t address " << data_pkt->getAddr() << "\n";
+//        		std::cout << curTick() << "\tIcache wait response:: in finishTranslation() " << "\n";
+        	}
+        	//-----CHANGED----
+
+
             DPRINTF(Fetch, "[tid:%i]: Doing Icache access.\n", tid);
             DPRINTF(Activity, "[tid:%i]: Activity: Waiting on I-cache "
                     "response.\n", tid);
@@ -703,6 +770,8 @@ DefaultFetch<Impl>::finishTranslation(const Fault &fault, RequestPtr mem_req)
             // Notify Fetch Request probe when a packet containing a fetch
             // request is successfully sent
             ppFetchRequestSent->notify(mem_req);
+            //addToDelayPath(data_pkt->getAddr(), 13, curTick(), data_pkt->req->masterId(), "finish_fetch", 1234, data_pkt->req->masterId(), curTick());
+
         }
     } else {
         // Don't send an instruction to decode if we can't handle it.
@@ -1156,6 +1225,24 @@ DefaultFetch<Impl>::fetch(bool &status_change)
 
     assert(!cpu->switchedOut());
 
+//    if (fetchStatus[tid] == Blocked) {
+//        DPRINTF(CpuStatus," Fetch is blocked (blocked)\n");
+////        recordStatus(name(), "fetch", 1, curTick());
+//    }
+
+    if(fetchStatus[tid] == Idle) {
+        DPRINTF(CpuStatus," fetch: 2: (idle): overall_fetch_status: %d\n", _status);
+        recordStatus(curTick(), name(), "fetch", 2, _status, "none");
+    }
+    else if (fetchStatus[tid] == Blocked) {
+    	DPRINTF(CpuStatus," fetch: 1: (blocked): overall_fetch_status: %d\n", _status);
+    	recordStatus(curTick(), name(), "fetch", 1, _status, "none");
+    }
+    else {
+    	DPRINTF(CpuStatus," fetch: 0: (running): overall_fetch_status: %d\n", _status);
+    	recordStatus(curTick(), name(), "fetch", 0, _status, "none");
+    }
+
     if (tid == InvalidThreadID) {
         // Breaks looping condition in tick()
         threadFetched = numFetchingThreads;
@@ -1174,6 +1261,11 @@ DefaultFetch<Impl>::fetch(bool &status_change)
 
     Addr pcOffset = fetchOffset[tid];
     Addr fetchAddr = (thisPC.instAddr() + pcOffset) & BaseCPU::PCMask;
+
+    //-----CHANGED----
+//       std::cout << "fetch(): PCState= " << thisPC << "\n";
+//       std::cout << "fetch(): fetchAddr= " << fetchAddr << "\n";
+    //-----CHANGED----
 
     bool inRom = isRomMicroPC(thisPC.microPC());
 
@@ -1197,6 +1289,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             DPRINTF(Fetch, "[tid:%i]: Attempting to translate and read "
                     "instruction, starting at PC %s.\n", tid, thisPC);
 
+//            std::cout << "Current PC: " << thisPC << "\n";
             fetchCacheLine(fetchAddr, tid, thisPC.instAddr());
 
             if (fetchStatus[tid] == IcacheWaitResponse)
@@ -1218,6 +1311,8 @@ DefaultFetch<Impl>::fetch(bool &status_change)
         if (fetchStatus[tid] == Idle) {
             ++fetchIdleCycles;
             DPRINTF(Fetch, "[tid:%i]: Fetch is idle!\n", tid);
+            DPRINTF(CpuStatus," Fetch is blocked (idle)\n");
+//        	std::cout << curTick() << "\t Fetch is blocked (idle)\n";
         }
 
         // Status is Idle, so fetch should do nothing.
@@ -1254,6 +1349,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
     // Loop through instruction memory from the cache.
     // Keep issuing while fetchWidth is available and branch is not
     // predicted taken
+//    std::cout << "\n FetchWidth is: " << fetchWidth << "\n";
     while (numInst < fetchWidth && fetchQueue[tid].size() < fetchQueueSize
            && !predictedBranch && !quiesce) {
         // We need to process more memory if we aren't going to get a
@@ -1339,6 +1435,13 @@ DefaultFetch<Impl>::fetch(bool &status_change)
 
             ppFetch->notify(instruction);
             numInst++;
+
+//            std::cout << "-----Fetch-----\n";
+////            std::cout << curTick() << "\tNumInst fetched in this cycle: " << numInst << "\n";
+//            std::cout << "inst type : " << instruction->getName() << "\n";
+//            std::cout << "inst addr: " << instruction->instAddr() << "\n";
+//            std::cout << "inst microPC: " << instruction->microPC() << "\n";
+//            std::cout << "Fetch inst PC: " << instruction->pcState() << "\n";
 
 #if TRACING_ON
             if (DTRACE(O3PipeView)) {

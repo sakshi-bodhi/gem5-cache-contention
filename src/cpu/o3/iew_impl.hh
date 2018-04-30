@@ -59,8 +59,12 @@
 #include "debug/Activity.hh"
 #include "debug/Drain.hh"
 #include "debug/IEW.hh"
+#include "debug/MYRENAME.hh"
 #include "debug/O3PipeView.hh"
 #include "params/DerivO3CPU.hh"
+#include "debug/Drain.hh"
+#include "debug/MYIEW.hh"
+#include "debug/CpuStatus.hh"
 
 using namespace std;
 
@@ -474,6 +478,7 @@ DefaultIEW<Impl>::squash(ThreadID tid)
     }
 
     emptyRenameInsts(tid);
+
 }
 
 template<class Impl>
@@ -907,9 +912,49 @@ DefaultIEW<Impl>::dispatch(ThreadID tid)
     //     continue trying to empty skid buffer
     //     check if stall conditions have passed
 
+
+    if(dispatchStatus[tid] == Idle) {
+        DPRINTF(CpuStatus," dispatch: 2: (idle): overall_stage_status: %d\n", _status);
+    	recordStatus(curTick(), name(), "dispatch_iew", 2, _status, "none");
+    }
+    else if (dispatchStatus[tid] == Blocked) {
+    	DPRINTF(CpuStatus," dispatch: 1: (blocked): overall_stage_status: %d\n", _status);
+    	recordStatus(curTick(), name(), "dispatch_iew", 1, _status, "none");
+    }
+    else {
+    	DPRINTF(CpuStatus," dispatch: 0: (running): overall_stage_status: %d\n", _status);
+    	recordStatus(curTick(), name(), "dispatch_iew", 0, _status, "none");
+    }
+
+    if(exeStatus == Idle) {
+    	DPRINTF(CpuStatus," exe: 2: (idle): overall_stage_status: %d\n", _status);
+    	recordStatus(curTick(), name(), "exe_iew", 2, _status, "none");
+    }
+    else if (exeStatus == Blocked) {
+    	DPRINTF(CpuStatus," exe: 1: (blocked): overall_stage_status: %d\n", _status);
+    	recordStatus(curTick(), name(), "exe_iew", 1, _status, "none");
+    }
+    else {
+    	DPRINTF(CpuStatus," exe: 0: (running): overall_stage_status: %d\n", _status);
+    	recordStatus(curTick(), name(), "exe_iew", 0, _status, "none");
+    }
+
+    if(wbStatus == Idle) {
+    	DPRINTF(CpuStatus," wb: 2: (idle): overall_stage_status: %d\n", _status);
+    	recordStatus(curTick(), name(), "wb_iew", 2, _status, "none");
+    }
+    else if (wbStatus == Blocked) {
+    	DPRINTF(CpuStatus," wb: 1: (blocked): overall_stage_status: %d\n", _status);
+    	recordStatus(curTick(), name(), "wb_iew", 1, _status, "none");
+    }
+    else {
+    	DPRINTF(CpuStatus," wb: 0: (running): overall_stage_status: %d\n", _status);
+    	recordStatus(curTick(), name(), "wb_iew", 0, _status, "none");
+    }
+
     if (dispatchStatus[tid] == Blocked) {
         ++iewBlockCycles;
-
+        DPRINTF(CpuStatus," Dispatch is blocked (IEW)\n");
     } else if (dispatchStatus[tid] == Squashing) {
         ++iewSquashCycles;
     }
@@ -1010,6 +1055,9 @@ DefaultIEW<Impl>::dispatchInsts(ThreadID tid)
         if (instQueue.isFull(tid)) {
             DPRINTF(IEW, "[tid:%i]: Issue: IQ has become full.\n", tid);
 
+//            DPRINTF(MYIEW,"Status: 1\n");
+            DPRINTF(MYIEW,"Issue: Status: 1 \t IQ has become full (IQ:LQ:SQ) \t %d\t%d\t%d \n", instQueue.getCount(tid),ldstQueue.numLoads(),ldstQueue.numStores());
+//            DPRINTF(MYRENAME,"Issue: Status: 1 \t IQ has become full (IQ:LQ:SQ) \t %d\t%d\t%d \n", instQueue.getCount(tid),ldstQueue.numLoads(),ldstQueue.numStores());
             // Call function to start blocking.
             block(tid);
 
@@ -1027,6 +1075,22 @@ DefaultIEW<Impl>::dispatchInsts(ThreadID tid)
             (inst->isStore() && ldstQueue.sqFull(tid))) {
             DPRINTF(IEW, "[tid:%i]: Issue: %s has become full.\n",tid,
                     inst->isLoad() ? "LQ" : "SQ");
+
+//            if(inst->isLoad()) {
+//            	DPRINTF(MYIEW,"Status: 2\n");
+//            }
+//            else {
+//            	DPRINTF(MYIEW,"Status: 3\n");
+//            }
+
+            if(inst->isLoad()) {
+            	DPRINTF(MYIEW,"Issue:  Status: 2 \t LQ has become full (IQ:LQ:SQ) \t %d\t%d\t%d \n", instQueue.getCount(tid),ldstQueue.numLoads(),ldstQueue.numStores());
+//            	DPRINTF(MYRENAME,"Issue:  Status: 2 \t LQ has become full (IQ:LQ:SQ) \t %d\t%d\t%d \n", instQueue.getCount(tid),ldstQueue.numLoads(),ldstQueue.numStores());
+            }
+            else {
+            	DPRINTF(MYIEW,"Issue:  Status: 3 \t SQ has become full (IQ:LQ:SQ) \t %d\t%d\t%d \n", instQueue.getCount(tid),ldstQueue.numLoads(),ldstQueue.numStores());
+//            	DPRINTF(MYRENAME,"Issue:  Status: 3 \t SQ has become full (IQ:LQ:SQ) \t %d\t%d\t%d \n", instQueue.getCount(tid),ldstQueue.numLoads(),ldstQueue.numStores());
+            }
 
             // Call function to start blocking.
             block(tid);
@@ -1126,6 +1190,15 @@ DefaultIEW<Impl>::dispatchInsts(ThreadID tid)
         toRename->iewInfo[tid].dispatched++;
 
         ++iewDispatchedInsts;
+
+//        DPRINTF(MYIEW,"Issue: IQ is active (IQ:LQ:SQ) \t %d\t%d\t%d \n", instQueue.getCount(tid),ldstQueue.numLoads(),ldstQueue.numStores());
+//
+//        if(inst->isLoad()) {
+//            DPRINTF(MYIEW,"Issue: LQ is active (IQ:LQ:SQ) \t %d\t%d\t%d \n", instQueue.getCount(tid),ldstQueue.numLoads(),ldstQueue.numStores());
+//        }
+//        else if(inst->isStore()) {
+//            DPRINTF(MYIEW,"Issue: SQ is active (IQ:LQ:SQ) \t %d\t%d\t%d \n", instQueue.getCount(tid),ldstQueue.numLoads(),ldstQueue.numStores());
+//        }
 
 #if TRACING_ON
         inst->dispatchTick = curTick() - inst->fetchTick;
@@ -1483,6 +1556,7 @@ DefaultIEW<Impl>::tick()
         // Have the instruction queue try to schedule any ready instructions.
         // (In actuality, this scheduling is for instructions that will
         // be executed next cycle.)
+
         instQueue.scheduleReadyInsts();
 
         // Also should advance its own time buffers if the stage ran.

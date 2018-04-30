@@ -135,6 +135,12 @@ LSQUnit<Impl>::completeDataAccess(PacketPtr pkt)
     }
 
     pkt->req->setAccessLatency();
+
+    //-----CHANGED----
+//    std::cout << "delay_path \tStage13 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\t with packet's finish time " << pkt->req->getAccessLatency() << "\n";
+    addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "Resp", true, 2);
+    //-----CHANGED----
+
     cpu->ppDataAccessComplete->notify(std::make_pair(inst, pkt));
 
     delete state;
@@ -350,6 +356,9 @@ LSQUnit<Impl>::insert(DynInstPtr &inst)
         insertStore(inst);
     }
 
+//    std::cout << "DUMP ------------dumpInsts (LSQ)-----------\n";
+//    dumpInsts();
+
     inst->setInLSQ();
 }
 
@@ -376,6 +385,10 @@ LSQUnit<Impl>::insertLoad(DynInstPtr &load_inst)
     incrLdIdx(loadTail);
 
     ++loads;
+//    std::cout << curTick() << "\tLoad Queue size: " << loads << "\n";
+//    std::cout << curTick() << "\tinst addr: " << load_inst->instAddr() << "\n";
+//    std::cout << "inst microPC: " << load_inst->microPC() << "\n";
+//    std::cout << "inst type: " << load_inst->getName() << "\n";
 }
 
 template <class Impl>
@@ -397,6 +410,10 @@ LSQUnit<Impl>::insertStore(DynInstPtr &store_inst)
     incrStIdx(storeTail);
 
     ++stores;
+//    std::cout << curTick() << "\tStore Queue size: " << stores << "\n";
+//    std::cout << curTick() << "\tinst addr: " << store_inst->instAddr() << "\n";
+//    std::cout << "inst microPC: " << store_inst->microPC() << "\n";
+//    std::cout << "inst type: " << store_inst->getName() << "\n";
 }
 
 template <class Impl>
@@ -615,6 +632,11 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst)
 
     assert(!inst->isSquashed());
 
+//    std::cout << "\n" << curTick() << "\tLOADREQ inst sn " << inst->seqNum << "\t";
+//    std::cout << "inst type : " << inst->getName() << "\t";
+//    std::cout << "inst pc : " << inst->pcState() << "\t";
+//    std::cout << "inst addr: " << inst->instAddr() << "\n";
+
     load_fault = inst->initiateAcc();
 
     if (inst->isTranslationDelayed() &&
@@ -752,6 +774,9 @@ LSQUnit<Impl>::commitStores(InstSeqNum &youngest_inst)
                     storeQueue[store_idx].inst->pcState(),
                     storeQueue[store_idx].inst->seqNum);
 
+//            std::cout << "SQ index for inst sn " << storeQueue[store_idx].inst->seqNum << " is " << storeQueue[store_idx].inst->sqIdx << "\n";
+//            completeStore(storeQueue[store_idx].inst->sqIdx);
+
             storeQueue[store_idx].canWB = true;
 
             ++storesToWB;
@@ -786,6 +811,9 @@ LSQUnit<Impl>::writebackStores()
     if (TheISA::HasUnalignedMemAcc) {
         writebackPendingStore();
     }
+
+//    std::cout << "Before storeHead " << storeHead << "\tstoreTail" << storeTail << "\tstoreWBIdx " << storeWBIdx << "\n";
+//    dumpInsts();
 
     while (storesToWB > 0 &&
            storeWBIdx != storeTail &&
@@ -973,6 +1001,7 @@ LSQUnit<Impl>::writebackStores()
             }
         }
     }
+//    std::cout << "After storeHead " << storeHead << "\tstoreTail" << storeTail << "\tstoreWBIdx " << storeWBIdx << "\n";
 
     // Not sure this should set it to 0.
     usedStorePorts = 0;
@@ -1220,6 +1249,11 @@ template <class Impl>
 bool
 LSQUnit<Impl>::sendStore(PacketPtr data_pkt)
 {
+    //-----------CHANGED----------
+//    std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << name() << "\t" << data_pkt->req->rid << "\t" << data_pkt->getAddr() << "\t" << data_pkt->req->masterId() << "\t with packet's entry time " << data_pkt->req->entryTime << "\n";
+    initDelayPath(data_pkt->req->rid, data_pkt->getAddr(), data_pkt->req->masterId(), data_pkt->req->entryTime);
+    //-----------CHANGED----------
+
     if (!dcachePort->sendTimingReq(data_pkt)) {
         // Need to handle becoming blocked on a store.
         isStoreBlocked = true;
@@ -1302,6 +1336,7 @@ template <class Impl>
 void
 LSQUnit<Impl>::dumpInsts() const
 {
+	std::cout << curTick() << "\n";
     cprintf("Load store queue: Dumping instructions.\n");
     cprintf("Load queue size: %i\n", loads);
     cprintf("Load queue: ");
@@ -1310,7 +1345,10 @@ LSQUnit<Impl>::dumpInsts() const
 
     while (load_idx != loadTail && loadQueue[load_idx]) {
         const DynInstPtr &inst(loadQueue[load_idx]);
-        cprintf("%s.[sn:%i] ", inst->pcState(), inst->seqNum);
+        cprintf("%s.[sn:%i] load_idx %d ", inst->pcState(), inst->seqNum, load_idx);
+//        Request *req = loadQueue[load_idx].req;
+        if(inst->memData != NULL)
+        	cprintf("\tReading from Addr:%#x, data:%#x\n", inst->effAddr,(int)*(inst->memData));
 
         incrLdIdx(load_idx);
     }
@@ -1323,7 +1361,10 @@ LSQUnit<Impl>::dumpInsts() const
 
     while (store_idx != storeTail && storeQueue[store_idx].inst) {
         const DynInstPtr &inst(storeQueue[store_idx].inst);
-        cprintf("%s.[sn:%i] ", inst->pcState(), inst->seqNum);
+        cprintf("%s.[sn:%i] store_idx %d ", inst->pcState(), inst->seqNum, store_idx);
+        Request *req = storeQueue[store_idx].req;
+        if(req != NULL && inst->memData != NULL)
+        	cprintf("\tWriting to Addr:%#x, data:%#x\n", req->getPaddr(),(int)*(inst->memData));
 
         incrStIdx(store_idx);
     }

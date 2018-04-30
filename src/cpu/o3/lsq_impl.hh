@@ -75,6 +75,9 @@ LSQ<Impl>::LSQ(O3CPU *cpu_ptr, IEW *iew_ptr, DerivO3CPUParams *params)
     std::transform(policy.begin(), policy.end(), policy.begin(),
                    (int(*)(int)) tolower);
 
+//    std::cout << "Max inst in LQ " << LQEntries << "\n";
+//    std::cout << "Max inst in SQ " << SQEntries << "\n";
+
     //Figure out fetch policy
     if (policy == "dynamic") {
         lsqPolicy = Dynamic;
@@ -370,6 +373,9 @@ LSQ<Impl>::recvTimingResp(PacketPtr pkt)
         }
     }
 
+//    std::cout << "delay_path \tStage13 \t" << curTick() << "\t" << pkt->pid << "\t" << pkt->req->masterId() << "\t" << pkt->getAddr() << "\t" << name() << "\t with packet's finish time " << pkt->req->getAccessLatency() << "\tgot the masterport\n";
+//    addToDelayPath(pkt->pid, 13, curTick(), 1248, name(), pkt->getAddr(), pkt->req->masterId(), pkt->req->getAccessLatency());
+
     delete pkt->req;
     delete pkt;
     return true;
@@ -390,6 +396,10 @@ LSQ<Impl>::recvTimingSnoopReq(PacketPtr pkt)
             thread[tid].checkSnoop(pkt);
         }
     }
+
+//    std::cout << "delay_path \tStage13 \t" << curTick() << "\t" << pkt->pid << "\t" << pkt->req->masterId() << "\t" << pkt->getAddr() << "\t" << name() << "\t with packet's finish time " << pkt->req->getAccessLatency() << "\tgot the masterport\n";
+//    addToDelayPath(pkt->pid, 13, curTick(), 1248, name(), pkt->getAddr(), pkt->req->masterId(), pkt->req->getAccessLatency());
+
 }
 
 template<class Impl>

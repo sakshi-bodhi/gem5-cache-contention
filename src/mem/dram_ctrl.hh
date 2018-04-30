@@ -843,6 +843,8 @@ class DRAMCtrl : public AbstractMemory
      */
     void printQs() const;
 
+    void printRRWQ();
+
     /**
      * Burst-align an address.
      *

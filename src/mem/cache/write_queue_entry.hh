@@ -110,12 +110,14 @@ class WriteQueueEntry : public QueueEntry, public Printable
      * @sa MissQueue, WriteQueue::readyList
      */
     Iterator readyIter;
+    Iterator readyIterGlobal;	// entry in l3ReqQueue
 
     /**
      * Pointer to this entry on the allocated list.
      * @sa MissQueue, WriteQueue::allocatedList
      */
     Iterator allocIter;
+    Iterator allocIterGlobal;	// entry in l3ReqQueue
 
     /** List of all requests that match the address */
     TargetList targets;

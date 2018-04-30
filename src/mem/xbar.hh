@@ -175,6 +175,17 @@ class BaseXBar : public MemObject
          */
         void regStats();
 
+
+        //*****CHANGED*******
+        SrcType* findPrioritizedPort(int priority, SrcType* retryingPort);
+        //*****CHANGED*******
+
+        //--------CHANGED-------
+        uint64_t layerLastFreeAt = 0;
+        uint64_t layerBusyFor = 0;
+        //--------CHANGED-------
+
+
       protected:
 
         /**
@@ -465,6 +476,7 @@ class BaseXBar : public MemObject
                                 PortID idx = InvalidPortID);
 
     virtual void regStats();
+
 
 };
 

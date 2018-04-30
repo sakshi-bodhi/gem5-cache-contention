@@ -53,7 +53,8 @@ using namespace std;
 WriteQueue::WriteQueue(const std::string &_label,
                        int num_entries, int reserve)
     : Queue<WriteQueueEntry>(_label, num_entries, reserve)
-{}
+      {	//std::cout << "Queue created for the entry type WriteQueue, has " << num_entries << " entries\n";
+      }
 
 WriteQueueEntry *
 WriteQueue::allocate(Addr blk_addr, unsigned blk_size, PacketPtr pkt,
@@ -71,6 +72,83 @@ WriteQueue::allocate(Addr blk_addr, unsigned blk_size, PacketPtr pkt,
     allocated += 1;
     return entry;
 }
+
+int readCoreIdWB(std::string name) {		//reading first integer from a string as a core id
+
+  	std::vector<char> v(name.length() + 1);
+  	std::strcpy(&v[0], name.c_str());
+  	char* p = &v[0];
+  	long int core = -1;
+  	while (*p) { // While there are more characters to process...
+  	    if (isdigit(*p)) { // Upon finding a digit, ...
+  	        core = strtol(p, &p, 10); // Read a number, ...
+  //	        printf("CPU id %d\n", int(core)); // and print it.
+  	        break;
+  	    }
+  	    else { // Otherwise, move on to the next character.
+  	        p++;
+  	    }
+  	}
+  	return int(core);
+  }
+
+
+WriteQueueEntry *
+WriteQueue::allocateL3RQ(WriteQueueEntry *wb_entry, std::string cacheName)
+{
+	int Qsize = 0;
+//	if(timer < 11) {
+	std::cout << "WB entry " << wb_entry << "\n";
+        for (auto i = readyList.begin(); i != readyList.end(); ++i) {
+	        	std::cout << "wb_entry " << *i << "\t" <<  curTick() << "\t" << (*i)->readyTime << "\n";
+        	if((*i)->readyTime <= curTick()) {
+        		Qsize++;
+        	}
+        	else {
+        		continue;
+        	}
+        }
+        std::ostringstream stringStream;
+        stringStream << wb_entry;
+        std::string addr_wb_entry = stringStream.str();
+//        std::string buffer;
+//        sprintf (buffer, "Little %llx", wb_entry);
+//        std::cout << "LITTLE " << buffer << "\n";
+	calcGQSize(cacheName+"GlobalWB", addr_wb_entry, curTick(), wb_entry->readyTime, Qsize, "I");
+	wb_entry->allocIterGlobal = allocatedList.insert(allocatedList.end(), wb_entry);
+	wb_entry->readyIterGlobal = addToReadyList(wb_entry);
+    Qsize = 0;
+
+	   int id = readCoreId(cacheName);
+//	   std::cout << curTick() << "\t" << int(curTick()/500) << "\t" << name() << "\t" << cacheName << "\t(WB allocate)core id " << id << "\t" << wb_entry << "\t" <<  wb_entry->readyTime << "\n";
+	   setPriority(id, 2);
+
+//    std::cout << "WB ready list size: " << readyList.size() << "\n";
+//
+//    for (auto i = readyList.begin(); i != readyList.end(); ++i) {
+//    	std::cout << curTick() << "\twb_entry " << *i << "\t" <<  (*i)->readyTime << "\n";
+//    }
+//
+//    std::cout << "WB allocated list size: " << allocatedList.size() << "\n";
+//
+//    for (auto i = allocatedList.begin(); i != allocatedList.end(); ++i) {
+//     	std::cout << curTick() << "\twb_entry " << *i << "\t" <<  (*i)->readyTime << "\n";
+//    }
+
+//	std::cout << wb_entry->readyTime << " Incremented GlobalReadyList size " << Qsize << "\n";
+//	timer++;
+//	}
+//    if (mshr->getTarget()->pkt->req->masterId() == 9 || mshr->getTarget()->pkt->req->masterId() == 10) {
+//    	schedC3 = allocatedList.size();
+//    }
+//    else {
+//    	schedC4 = allocatedList.size();
+//    }
+//    schedTRL3 = schedC1 + schedC2 + schedC3 + schedC4;
+    return wb_entry;
+
+}
+
 
 void
 WriteQueue::markInService(WriteQueueEntry *entry)

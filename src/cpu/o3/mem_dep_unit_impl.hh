@@ -457,9 +457,13 @@ MemDepUnit<MemDepPred, Impl>::wakeDependents(DynInstPtr &inst)
     }
 
     MemDepEntryPtr inst_entry = findInHash(inst);
-
+//
+//    std::cout << curTick() << "DUMP DEPENDENT instructions for inst " << inst->instAddr() << "\tinst type: " << inst->getName() << "\tseq no. " << inst->seqNum << "\n";
+//    std::cout << "DUMP DEPENDENT ------------START-------------\n";
     for (int i = 0; i < inst_entry->dependInsts.size(); ++i ) {
         MemDepEntryPtr woken_inst = inst_entry->dependInsts[i];
+
+//        std::cout << "DUMP DEPENDENT " << woken_inst->inst->instAddr() << "\tinst type: " << woken_inst->inst->getName() << "\tseq no. " << woken_inst->inst->seqNum << "\n";
 
         if (!woken_inst->inst) {
             // Potentially removed mem dep entries could be on this list
@@ -476,6 +480,8 @@ MemDepUnit<MemDepPred, Impl>::wakeDependents(DynInstPtr &inst)
             woken_inst->memDepReady = true;
         }
     }
+
+//    std::cout << "DUMP DEPENDENT ------------FINISH------------\n";
 
     inst_entry->dependInsts.clear();
 }

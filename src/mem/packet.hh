@@ -70,6 +70,7 @@ typedef Packet *PacketPtr;
 typedef uint8_t* PacketDataPtr;
 typedef std::list<PacketPtr> PacketList;
 
+
 class MemCmd
 {
     friend class Packet;
@@ -713,6 +714,9 @@ class Packet : public Printable
             size = req->getSize();
             flags.set(VALID_SIZE);
         }
+//        if(_req->rid ==6907713) {
+//        	std::cout << "SSTOP!!";
+//        }
     }
 
     /**
@@ -732,6 +736,10 @@ class Packet : public Printable
         }
         size = _blkSize;
         flags.set(VALID_SIZE);
+
+//        if(_req->rid ==6907713) {
+//        	std::cout << "SSTOP!!";
+//        }
     }
 
     /**
@@ -771,6 +779,10 @@ class Packet : public Printable
                 allocate();
             }
         }
+
+//        if(pkt->req->rid ==6907713) {
+//        	std::cout << "SSTOP!!";
+//        }
     }
 
     /**

@@ -95,6 +95,10 @@ class Port
 
   public:
 
+//    PortID idPort;	//changed (added later)
+ 	int reachedLLC;
+    int coreToLLCDelay;
+
     /** Return port name (for DPRINTF). */
     const std::string name() const { return portName; }
 
