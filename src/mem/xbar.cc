@@ -48,7 +48,6 @@
  */
 
 #include "mem/xbar.hh"
-#include "mem/cache/base.hh"
 
 #include "base/misc.hh"
 #include "base/trace.hh"
@@ -155,7 +154,7 @@ BaseXBar::calcPacketTiming(PacketPtr pkt, Tick header_delay)
 template <typename SrcType, typename DstType>
 BaseXBar::Layer<SrcType,DstType>::Layer(DstType& _port, BaseXBar& _xbar,
                                        const std::string& _name) :
-    port(_port), xbar(_xbar), _name(_name), state(IDLE),
+    nextLevelCacheStatus(false), port(_port), xbar(_xbar), _name(_name), state(IDLE),
     waitingForPeer(NULL), releaseEvent(this)
 {
 	   std::cout << "---Layer--- Port " << _port.name() << "\t xbar" << _xbar.name() << "\t name" << _name << "\n";
@@ -174,7 +173,8 @@ void BaseXBar::Layer<SrcType,DstType>::occupyLayer(Tick until)
     assert(until != 0);
     xbar.schedule(releaseEvent, until);
 
-    std::cout << curTick() << "\tTrace " << name() << " occupyLayer(xbar.cc): Layer is occupied until:\t" << until << "\n";
+//    std::cout << curTick() << "\t" << name() << " Trace LFCB occupied layer! until " << until << "\n";
+//    std::cout << curTick() << "\tTrace " << name() << " occupyLayer(xbar.cc): Layer is occupied until:\t" << until << "\n";
     DPRINTF(PktTrace, "%s: occupyLayer(xbar.cc): Layer is occupied until:\t %ld\n", name(), until);
 
     // account for the occupied ticks
@@ -197,7 +197,11 @@ BaseXBar::Layer<SrcType,DstType>::tryTiming(SrcType* src_port)
     // first we see if the layer is busy, next we check if the
     // destination port is already engaged in a transaction waiting
     // for a retry from the peer
+//	std::cout << "Trace port name " << port.name() << "\n";
+//	std::cout << "Trace getting cache status " << nextLevelCacheStatus << "\n";
+
     if (state == BUSY || waitingForPeer != NULL) {
+//    if (state == BUSY) {
         // the port should not be waiting already
         assert(std::find(waitingForLayer.begin(), waitingForLayer.end(),
                          src_port) == waitingForLayer.end());
@@ -216,7 +220,15 @@ BaseXBar::Layer<SrcType,DstType>::tryTiming(SrcType* src_port)
 
 
         waitingForLayer.push_back(src_port);
-                std::cout << curTick() << "\t" << name() << "\tLayer is busy. Push port id " << src_port->getId() << " to WFL with size: \t" << waitingForLayer.size() << "\n";
+
+//        std::cout << curTick() << "\t" << name() << "\tTrace Layer is busy. Push port id " << src_port->getId() << "\n";
+//       	std::cout <<curTick() << "\t" << name() << " Trace LFCB waitingForLayer size " << waitingForLayer.size() << "\tElements are: ";
+
+//       	for(int i = 0; i < waitingForLayer.size(); i++) {
+//       		std::cout << ' ' << waitingForLayer.at(i)->getId();
+//       	}
+//       	std::cout << "\n";
+//       	std::cout << curTick() << " Trace LFCB tryTiming Fail!!\t State: " << state << "\tWFP: "  << waitingForPeer << "\n";
 //        std::cout << curTick() << "\tpush\t" << waitingForLayer.size() << "\t" << layerLastFreeAt << "\t" << layerBusyFor << "\t" << name() << "\n";
 //        std::cout<< "xbar---Port which is waitingForLayer : " << name() << "\tis " << src_port << "\n";
         return false;
@@ -239,7 +251,7 @@ BaseXBar::Layer<SrcType,DstType>::succeededTiming(Tick busy_time)
     // test
     assert(state == BUSY);
 
-    std::cout << curTick() << "\tTrace " << name() << " succeededTiming(xbar.cc): now occupying layer for \t" << busy_time << " ticks\n";
+//    std::cout << curTick() << "\tTrace " << name() << " succeededTiming(xbar.cc): now occupying layer until \t" << busy_time << " ticks\n";
 
     // occupy the layer accordingly
 //    std::cout<< "xbar---succeededTiming::Layer- " << name() << "\t is BUSY for " << (busy_time - curTick()) << "\n";
@@ -258,14 +270,26 @@ BaseXBar::Layer<SrcType,DstType>::failedTiming(SrcType* src_port,
     // if the source port is the current retrying one or not, we have
     // failed in forwarding and should track that we are now waiting
     // for the peer to send a retry
-    waitingForPeer = src_port;
+
+//	std::cout << "Trace (failedTiming) port name " << port.name() << "\n";
+//	std::cout << "Trace (FT) getting cache status " << nextLevelCacheStatus << "\n";
+
+//    if (nextLevelCacheStatus) {
+//    	std::cout << "Trace cache is busy so adding to WFL\n";
+//        waitingForLayer.push_front(src_port);
+//        std::cout << curTick() << "\t" << name() << "\tcache is busy. Push port id " << src_port->getId() << " to WFL with size: \t" << waitingForLayer.size() << "\n";
+//    }
+////
+//    else {
+    	waitingForPeer = src_port;
+//    }
 
     // we should have gone from idle or retry to busy in the tryTiming
     // test
     assert(state == BUSY);
 
     // occupy the bus accordingly
-    std::cout << curTick() << "\tTrace " << name() << " failedTiming(xbar.cc): now occupying layer for \t" << busy_time << " ticks:\t and retrying src_port is " << src_port->getId() << "\n";
+//    std::cout << curTick() << "\tTrace " << name() << " failedTiming(xbar.cc): now occupying layer for \t" << busy_time << " ticks:\t and retrying src_port is " << src_port->getId() << "\n";
     occupyLayer(busy_time);
 }
 
@@ -277,7 +301,8 @@ BaseXBar::Layer<SrcType,DstType>::releaseLayer()
     assert(state == BUSY);
     assert(!releaseEvent.scheduled());
 
-    std::cout << curTick() << "\tTrace " << name() << " releaseLayer(xbar.cc): Layer is released at:\t" << curTick() << "\n";
+//    std::cout << curTick() << "\t" << name() << " Trace LFCB release layer!\n";
+//    std::cout << curTick() << "\t" << name() << " Trace LFCB releaseLayer(xbar.cc): Layer is released at:\t" << curTick() << "\n";
     DPRINTF(PktTrace, "%s: releaseLayer(xbar.cc): Layer is released at:\t %ld\n", name(), curTick());
 
     // update the state
@@ -286,6 +311,10 @@ BaseXBar::Layer<SrcType,DstType>::releaseLayer()
 //    std::cout<< "xbar---releaseLayer::Layer " << name() << "is IDLE now\n";
 
     // bus layer is now idle, so if someone is waiting we can retry
+
+//    if (nextLevelCacheStatus) {
+//    	std::cout << "Trace not calling retryWaiting as cache is busy\n";
+//    }
     if (!waitingForLayer.empty()) {
         // there is no point in sending a retry if someone is still
         // waiting for the peer
@@ -357,10 +386,10 @@ BaseXBar::Layer<SrcType,DstType>::retryWaiting()
 //}
     //-------PRIORITIZATION-------------
 
-        if(retryingPort->name().find("tol3bus.slave") != std::string::npos) {
-        	retryingCore(retryingPort->getId());
-        }
-        std::cout << curTick() << "\tTrace " << name() << " retryWaiting(xbar.cc): retrying port is\t" << retryingPort->getId() << "\n";
+//        if(retryingPort->name().find("tol3bus.slave") != std::string::npos) {
+//        	retryingCore(retryingPort->getId());
+//        }
+//        std::cout << curTick() << "\t" << name() << " Trace retryWaiting(xbar.cc): retrying port is\t" << retryingPort->getId() << "\n";
     waitingForLayer.pop_front();
     //--------Changed----------
 
@@ -400,6 +429,8 @@ BaseXBar::Layer<SrcType,DstType>::recvRetry()
 {
     // we should never get a retry without having failed to forward
     // something to this port
+
+//	std::cout << curTick() << "\t" << name() << " Trace recvRetry()(xbar.cc)\n";
     assert(waitingForPeer != NULL);
 
     // add the port where the failed packet originated to the front of
@@ -421,7 +452,7 @@ BaseXBar::Layer<SrcType,DstType>::recvRetry()
     // if the layer is idle, retry this port straight away, if we
     // are busy, then simply let the port wait for its turn
 
-    std::cout << curTick() << "\tTrace " << name() << " recvRetry(xbar.cc): waitingForPeer port is\t" << waitingForPeer->getId() << "\n";
+//    std::cout << curTick() << "\tTrace " << name() << " recvRetry(xbar.cc): waitingForPeer port is\t" << waitingForPeer->getId() << "\n";
 
     if (state == IDLE) {
         retryWaiting();

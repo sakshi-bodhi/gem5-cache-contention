@@ -104,6 +104,10 @@ class Cache : public BaseCache
 
       public:
 
+//        bool sendCacheStatus();
+
+        virtual void addPort2Queue(PacketPtr pkt, uint64_t portType);
+
         CpuSidePort(const std::string &_name, Cache *_cache,
                     const std::string &_label);
 
@@ -355,6 +359,11 @@ class Cache : public BaseCache
             cmd.isLLSC();
     }
 
+
+//    void addPort2Queue(uint64_t portType);
+
+//    uint64_t removePortFromQueue();
+
     /**
      * Performs the access specified by the request.
      * @param pkt The request to perform.
@@ -382,7 +391,7 @@ class Cache : public BaseCache
      * Handles a response (cache line fill/write ack) from the bus.
      * @param pkt The response packet
      */
-    void recvTimingResp(PacketPtr pkt);
+    bool recvTimingResp(PacketPtr pkt);
 
     /**
      * Snoops bus transactions to maintain coherence.

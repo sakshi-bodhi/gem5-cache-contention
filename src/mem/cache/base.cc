@@ -67,8 +67,17 @@ BaseCache::CacheSlavePort::CacheSlavePort(const std::string &_name,
 {
 }
 
+BaseCache::CacheMasterPort::CacheMasterPort(const std::string &_name, BaseCache *_cache,
+                ReqPacketQueue &_reqQueue,
+                SnoopRespPacketQueue &_snoopRespQueue) :
+    QueuedMasterPort(_name, _cache, _reqQueue, _snoopRespQueue),
+    mustSendRespRetry(false)
+{
+}
+
 BaseCache::BaseCache(const BaseCacheParams *p, unsigned blk_size)
     : MemObject(p),
+      cacheUnblockEvent(this),
       cpuSidePort(nullptr), memSidePort(nullptr),
       mshrQueue("MSHRs", p->mshrs, 0, p->demand_mshr_reserve), // see below
       writeBuffer("write buffer", p->write_buffers, p->mshrs), // see below
@@ -86,6 +95,10 @@ BaseCache::BaseCache(const BaseCacheParams *p, unsigned blk_size)
       noTargetMSHR(nullptr),
       missCount(p->max_miss_count),
       addrRanges(p->addr_ranges.begin(), p->addr_ranges.end()),
+//      addRetryPortToQueue(0,0),
+      cacheAccessBusy(false),
+      allowCacheAccessAt(0),
+      blockedCauseChanged(false),
       l3ReqQueue("l3ReqQueueMSHRs", p->mshrs, 0, p->demand_mshr_reserve),
       l3WBReqQueue("l3ReqQueueWBs", p->write_buffers, p->mshrs),
       system(p->system)
@@ -113,6 +126,7 @@ BaseCache::CacheSlavePort::setBlocked()
     assert(!blocked);
     DPRINTF(CachePort, "Port is blocking new requests\n");
     blocked = true;
+//    std::cout << curTick() << " Trace setBlocked " << name() << "\n";
     // if we already scheduled a retry in this cycle, but it has not yet
     // happened, cancel it
     if (sendRetryEvent.scheduled()) {
@@ -134,15 +148,135 @@ BaseCache::CacheSlavePort::clearBlocked()
     }
 }
 
+//void
+//BaseCache::CacheSlavePort::clearBlocked()
+//{
+//    assert(blocked);
+//    DPRINTF(CachePort, "Port is accepting new requests\n");
+//    blocked = false;
+//    std::cout << "reached inside if 2 set blocked to false\n";
+////    std::cout << curTick() << " Trace clearBlocked " << name() << "\n";
+//    std::cout << curTick() << " Trace cleared the blocked cache " << name() << " at portUnblockAt " << portUnblockAt << " mustSendRetry " << mustSendRetry << "\n";
+//    if (mustSendRetry) {
+//    		// @TODO: need to find a better time (next cycle?)
+//    		std::cout << curTick() << " Trace (mustSendRetry) scheduling a retry event for " << name() << "\t at " << (portUnblockAt) << " ticks\n";
+//    		owner.schedule(sendRetryEvent, (portUnblockAt));
+//    }
+//}
+
 void
 BaseCache::CacheSlavePort::processSendRetry()
 {
     DPRINTF(CachePort, "Port is sending retry\n");
 
+//    std::cout << curTick() << " Trace processSendRetry " << name() << "\n";
+
     // reset the flag and call retry
     mustSendRetry = false;
     sendRetryReq();
 }
+
+void
+BaseCache::processCacheUnblock()
+{
+    DPRINTF(CachePort, "Cache is set to free\n");
+
+//    std::cout << curTick() <<  "\t" << name() << " Trace (cache unblock) processSendRetry " << name() << "\n";
+    clearCacheAccessBusy();
+    uint64_t portSide;
+    if(cpuSidePort->isBlocked()) {
+    	portSide = findNextRetryPort();
+    }
+    else {
+    	portSide = addRetryPortToQueue.front().portType;
+    }
+    if(cpuSidePort->isMustSendRetry() && portSide == 1 && !cpuSidePort->isBlocked()) {
+        addRetryPortToQueue.pop_front();
+        cpuSidePort->clearMustSendRetry();
+//        std::cout << "Sending retry to a request!\n";
+    	cpuSidePort->sendRetryReq();
+    }
+    else if(memSidePort->isMustSendRespRetry() && portSide == 2) {
+        addRetryPortToQueue.pop_front();
+        memSidePort->clearMustSendRespRetry();
+//        std::cout << "Sending retry to a response!\n";
+    	memSidePort->sendRetryResp();
+    }
+    else if(cpuSidePort->isBlocked()) {
+        DPRINTF(CachePort, "No Response waiting... Requests might be waiting for the port to get unblocked!\n");
+//    	std::cout << "No Response waiting... Requests might be waiting for the port to get unblocked!\n";
+    }
+    else {
+        DPRINTF(CachePort, "Cache is set to free\n");
+//    	std::cout << "Cache is free!\n";
+    }
+}
+
+uint64_t
+BaseCache::findNextRetryPort() {
+	uint64_t retryingPort = 0;
+	int i;
+//	std::cout <<curTick() << "\t NextRetryPortQueue before: " << name() << " addRetryPortToQueue size " << addRetryPortToQueue.size() << "\n";
+//	printPortSideQueue();
+	for(i = 0; i < addRetryPortToQueue.size(); i++)
+	{
+		if(addRetryPortToQueue.at(i).portType == 1) {
+			continue;
+		}
+		else {
+			addRetryPortToQueue.push_front(addRetryPortToQueue.at(i));
+			addRetryPortToQueue.erase(addRetryPortToQueue.begin()+(i+1));
+			break;
+		}
+	}
+	if(addRetryPortToQueue.size()) {
+		retryingPort = addRetryPortToQueue.front().portType;
+	}
+//	std::cout <<curTick() << "\t NextRetryPortQueue after: " << name() << " addRetryPortToQueue size " << addRetryPortToQueue.size() << "\n";
+//	printPortSideQueue();
+//	std::cout << "retrying port id taken " << retryingPort << "\n";
+	return retryingPort;
+}
+
+void
+BaseCache::printPortSideQueue() {
+
+	std::cout <<curTick() << "\t RetryPortQueue: " << name() << " addRetryPortToQueue size " << addRetryPortToQueue.size() << "\n";
+	for(int i = 0; i < addRetryPortToQueue.size(); i++) {
+		std::cout << ' ' << addRetryPortToQueue.at(i).portType;
+	}
+	std::cout << "\n";
+}
+
+bool
+BaseCache::canAddPort2Queue(PacketPtr pkt, uint64_t portType) {
+//	std::cout << curTick() << "\tAdding in PortQ " << pkt->req->rid << "\t" << portType << "\n";
+	for(int i = 0; i < addRetryPortToQueue.size(); i++) {
+//		std::cout << curTick() << "\tPortQ " << addRetryPortToQueue.at(i).rid << "\t" << addRetryPortToQueue.at(i).portType << "\n";
+		if(addRetryPortToQueue.at(i).rid == pkt->req->rid && addRetryPortToQueue.at(i).portType == portType) {
+//			std::cout << "Already there... Cannot be added\n";
+			return false;
+		}
+	}
+	return true;
+}
+
+//void
+//BaseCache::processCacheUnblock()
+//{
+//    DPRINTF(CachePort, "Port is sending retry\n");
+//
+//    std::cout << curTick() <<  "\t" << name() << " Trace (cache unblock) processSendRetry " << name() << "\n";
+//    if(blockedCauseChanged) {
+//    	std::cout << curTick() << "\t" << name() << "\t Trace clear for a changed cause: \n";
+//        blocked_cycles[Cache_Busy] +=  curCycle() - blockedCycle;		//blockedCycle is same for MSHR/WB block and cache block
+//        cacheAccessBusy = false;
+//        blockedCauseChanged = false;
+//    }
+//    else {
+//    	clearCacheAccessBusy();
+//    }
+//}
 
 void
 BaseCache::init()

@@ -740,6 +740,12 @@ Cache::promoteWholeLineWrites(PacketPtr pkt)
     }
 }
 
+
+//uint64_t
+//Cache::removePortFromQueue() {
+//	return addRetryPortToQueue.pop_front();
+//}
+
 bool
 Cache::recvTimingReq(PacketPtr pkt)
 {
@@ -762,8 +768,6 @@ Cache::recvTimingReq(PacketPtr pkt)
 
       //-----CHANGED----
 
-    std::cout << curTick() << "\tTrace " << name() << " recvTimingReq(cache.cc):\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
-    DPRINTF(PktTrace, "%s: recvTimingReq(cache.cc): \t %ld: \t %ld: \t %ld: \n", name(), pkt->getAddr(), pkt->req->rid, pkt->req->getseqNum());
 
     // Just forward the packet if caches are disabled.
     if (system->bypassCaches()) {
@@ -842,11 +846,44 @@ Cache::recvTimingReq(PacketPtr pkt)
         return true;
     }
 
+//	std::cout << curTick() << "\tTrace " << name() << " recvTimingReq(cache.cc):\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
+
+	if(!isCacheAccessBusy() && !cpuSidePort->isBlocked()) {
+//		std::cout << curTick() << "\tTrace IF part blocking the cache (recvTR cache.cc) " << name() << "\n";
+//        if(name().find("l3") != std::string::npos) {
+        	allowCacheAccessAt = clockEdge(forwardLatency) + pkt->headerDelay;
+    		setCacheAccessBusy();
+            if(name().find("l3") != std::string::npos) {
+            	std::cout << curTick() << "\t" << name() << "\tRequest " << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
+            }
+//        }
+	}
+	else {
+//		std::cout << curTick() << "\tTrace ELSE part cache is already blocked (recvTR cache.cc) " << name() << "\n";
+//		std::cout << curTick() << "\t" << name() << " Cache busy! Adding a request entry to retry port.\n";
+    	cpuSidePort->addPort2Queue(pkt, 1);
+//		addRetryPortToQueue.push_back(1);
+//    	printPortSideQueue();
+    	return false;
+	}
+//	else {
+////        schedMemSideSendEvent(clockEdge(Cycles(1)));
+//		std::cout << curTick() << " Trace ELSE part (recvTR cache.cc) " << name() << "\t" << cacheUnblockAt << "\n";
+//		if(curTick() >= cacheUnblockAt && name().find("l3") != std::string::npos) {
+//			clearBlockCacheAccess();
+//			std::cout << "Trace cacheUnblockAt is " << cacheUnblockAt  << " curTick() is " << curTick() << " cleared cache.\n";
+//		}
+//		return false;
+//	}
+
+//	DPRINTF(PktTrace, "%s: recvTimingReq(cache.cc): \t %ld: \t %ld: \t %ld: \n", name(), pkt->getAddr(), pkt->req->rid, pkt->req->getseqNum());
+
+
     // anything that is merely forwarded pays for the forward latency and
     // the delay provided by the crossbar
     Tick forward_time = clockEdge(forwardLatency) + pkt->headerDelay;
 
-    // We use lookupLatency here because it is used to specify the latency
+   // We use lookupLatency here because it is used to specify the latency
     // to access.
     Cycles lat = lookupLatency;
 
@@ -1270,12 +1307,12 @@ Cache::recvTimingReq(PacketPtr pkt)
         }
     }
 
-//    std::cout << curTick() << "\tCache getting request\t" << name() << "\t" << pkt->getAddr() << "\t" << pkt->req << "\t" << pkt->req->rid << "\t" << pkt->req->masterId() << "\n";
+    std::cout << curTick() << "\tCache getting request\t" << name() << "\t" << pkt->getAddr() << "\t" << pkt->req << "\t" << pkt->req->rid << "\t" << pkt->req->masterId() << "\n";
 //
 //
-//    std::cout << name() << "\n**********Printing Cache status after REQUEST***********\n";
-//    std::cout << curTick() << "\n" << tags->print();
-//    std::cout << "******************\n";
+    std::cout << "**********Printing Cache status after REQUEST***********\n";
+    std::cout << tags->print();
+    std::cout << "******************\n";
 
     if (next_pf_time != MaxTick)
         schedMemSideSendEvent(next_pf_time);
@@ -1609,7 +1646,7 @@ Cache::handleUncacheableWriteResp(PacketPtr pkt)
     cpuSidePort->schedTimingResp(pkt, completion_time, true);
 }
 
-void
+bool
 Cache::recvTimingResp(PacketPtr pkt)
 {
 
@@ -1644,6 +1681,24 @@ Cache::recvTimingResp(PacketPtr pkt)
                 pkt->print());
     }
 
+
+    if(isCacheAccessBusy()) {
+    	cpuSidePort->addPort2Queue(pkt, 2);
+//    	addRetryPortToQueue.push_back(2);
+//    	printPortSideQueue();
+    	return false;
+    }
+    else {
+    	allowCacheAccessAt = clockEdge(responseLatency);
+//    	std::cout << "Response latency " << allowCacheAccessAt << "\n";
+//    	std::cout << "Forward latency " << (clockEdge(forwardLatency) +pkt->payloadDelay) << "\n";
+//    	std::cout << "payLoad latency " << pkt->payloadDelay << " headerDelay " << pkt->headerDelay << "\n";
+    	setCacheAccessBusy();
+        if(name().find("l3") != std::string::npos) {
+        	std::cout << curTick() << "\t" << name() << "\tResponse " << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
+        }
+    }
+
     DPRINTF(Cache, "%s: Handling response %s\n", __func__,
             pkt->print());
 
@@ -1652,7 +1707,7 @@ Cache::recvTimingResp(PacketPtr pkt)
     if (pkt->isWrite()) {
         assert(pkt->req->isUncacheable());
         handleUncacheableWriteResp(pkt);
-        return;
+        return true;
     }
 
     // we have dealt with any (uncacheable) writes above, from here on
@@ -1795,6 +1850,7 @@ Cache::recvTimingResp(PacketPtr pkt)
                 completion_time += clockEdge(responseLatency) +
                     (transfer_offset ? pkt->payloadDelay : 0);
 
+//                std::cout << "completion_time (is_fill) " << completion_time << "\n";
                 //    -----CHANGED----
 //                if(pkt->getAddr() == 960){
 //                	std::cout << curTick() <<"\t" << tgt_pkt->getAddr() << "\tCache::recvTimingResp()- target_packe- isFill()t\t" << name() << "\n";
@@ -1877,6 +1933,7 @@ Cache::recvTimingResp(PacketPtr pkt)
             }
             // Reset the bus additional time as it is now accounted for
             tgt_pkt->headerDelay = tgt_pkt->payloadDelay = 0;
+//            std::cout << "completion_time (before sending a resp) " << completion_time << "\n";
             cpuSidePort->schedTimingResp(tgt_pkt, completion_time, true);
             break;
 
@@ -1914,9 +1971,9 @@ Cache::recvTimingResp(PacketPtr pkt)
     }
 
 
-//    std::cout << name() << "\n**********Printing Cache status after RESPONSE***********\n";
-//    std::cout << curTick() << "\n" << tags->print();
-//    std::cout << "******************\n";
+    std::cout <<"**********Printing Cache status after RESPONSE***********\n";
+    std::cout << tags->print();
+    std::cout << "******************\n";
 
     DPRINTF(DelayPath, "%#llx \t %#llx \t %#llx \t %s \t Response\n", curTick(), pkt->req->rid, pkt->getAddr(),name());
     addToDelayPath(pkt->req->rid, pkt->getAddr(), forward_time, name()+".access", "Resp", false, 2);
@@ -2003,6 +2060,7 @@ Cache::recvTimingResp(PacketPtr pkt)
 
     DPRINTF(CacheVerbose, "%s: Leaving with %s\n", __func__, pkt->print());
     delete pkt;
+    return true;
 }
 
 PacketPtr
@@ -3143,6 +3201,30 @@ Cache::CpuSidePort::getAddrRanges() const
     return cache->getAddrRanges();
 }
 
+//bool
+//Cache::CpuSidePort::sendCacheStatus()
+//{
+////	std::cout << name() << " Trace cache::cpusideport::sendcachestatus " << cache->isCacheAccessBusy() << "\n";
+//	return cache->isCacheAccessBusy();
+//}
+
+void
+Cache::CpuSidePort::addPort2Queue(PacketPtr pkt, uint64_t portType)
+{
+//    	std::cout << curTick() << "\t" << name() << "\tcan Add in PortQ? " << pkt->req->rid << "\t" << portType << "\n";
+//    	cache->printPortSideQueue();
+	if(cache->canAddPort2Queue(pkt, portType)) {
+		portTypeQueue ptq;
+		ptq.rid = pkt->req->rid;
+		ptq.portType = portType;
+		cache->addRetryPortToQueue.push_back(ptq);
+	}
+
+//    if(name().find("l3") != std::string::npos) {
+//    	cache->printPortSideQueue();
+//    }
+}
+
 bool
 Cache::CpuSidePort::recvTimingReq(PacketPtr pkt)
 {
@@ -3194,8 +3276,11 @@ Cache::CpuSidePort::recvTimingReq(PacketPtr pkt)
     } else if (blocked || mustSendRetry) {
 
         //-----CHANGED----
+//    	std::cout << name() << " Trace blocked cache (or mustSendRetry) " << blocked << "\t" << mustSendRetry << "\n";
 //          std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tRequested but didn't get" << "\n";
           //-----CHANGED----
+    	addPort2Queue(pkt, 1);
+    	//    	addRetryPortToQueue.push_front(1);
 
         // either already committed to send a retry, or blocked
         success = false;
@@ -3208,10 +3293,12 @@ Cache::CpuSidePort::recvTimingReq(PacketPtr pkt)
         DPRINTF(DelayPath, "%#llx \t %#llx \t %#llx \t %s \t Request\n", curTick(), pkt->req->rid, pkt->getAddr(),name());
     	addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "Req", false, 2);
           //-----CHANGED----
+//        std::cout << "Trace value of blocked is " << blocked << "\n";
+//        blocked = true;
+//        std::cout << "Trace Blocked this cache\n";
 
-        success = cache->recvTimingReq(pkt);
+		success = cache->recvTimingReq(pkt);
     }
-
 
     // remember if we have to retry
     mustSendRetry = !success;
@@ -3260,8 +3347,17 @@ Cache::MemSidePort::recvTimingResp(PacketPtr pkt)
 	DPRINTF(DelayPath, "%#llx \t %#llx \t %#llx \t %s \t Response\n", curTick(), pkt->req->rid, pkt->getAddr(),name());
 	addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "Resp", false, 2);
 
-    cache->recvTimingResp(pkt);
-    return true;
+	bool success;
+
+	if(mustSendRespRetry) {
+    	cache->cpuSidePort->addPort2Queue(pkt, 2);
+//    	addRetryPortToQueue.push_front(2);
+		return false;
+	}
+		success = cache->recvTimingResp(pkt);
+
+		mustSendRespRetry = !success;
+		return success;
 }
 
 // Express snooping requests to memside port
@@ -3304,10 +3400,10 @@ Cache::CacheReqPacketQueue::sendDeferredPacket()
     // from the MSHR queue or write queue
     assert(deferredPacketReadyTime() == MaxTick);
 
-    std::cout << curTick() << "\tTrace " << name() << "\tat sendDefferedPacket from reqQueue (cache)\n";
-
     // check for request packets (requests & writebacks)
     QueueEntry* entry = cache.getNextQueueEntry();
+
+//    std::cout << curTick() << "\tTrace " << name() << "\t sendDefferedPacket from reqQueue(cache)\n";
 
     if (!entry) {
         // can happen if e.g. we attempt a writeback and fail, but
@@ -3321,6 +3417,8 @@ Cache::CacheReqPacketQueue::sendDeferredPacket()
         }
         waitingOnRetry = entry->sendPacket(cache);
     }
+
+//    std::cout << curTick() << "\tTrace " << name() << "\t sendDeferredPacket waitingOnRetry: " << waitingOnRetry << "\n";
 
     // if we succeeded and are not waiting for a retry, schedule the
     // next send considering when the next queue is ready, note that
@@ -3336,6 +3434,7 @@ Cache::CacheReqPacketQueue::sendDeferredPacket()
 //        	timer++;
         }
     	//----------CHANGED----------
+//        std::cout << curTick() << "\tTrace next Q ready time from " << name() << " is at tick " << cache.nextQueueReadyTime() << "\n";
         schedSendEvent(cache.nextQueueReadyTime());
     }
 }

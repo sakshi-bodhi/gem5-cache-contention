@@ -54,6 +54,9 @@ class L1Cache(Cache):
     response_latency = 2
     mshrs = 20
     tgts_per_mshr = 12
+#    write_buffers = 8
+#    mshrs = 2
+#    tgts_per_mshr = 2
 
 class L1_ICache(L1Cache):
     is_read_only = True
@@ -68,6 +71,9 @@ class L2Cache(Cache):
     tag_latency = 10
     data_latency = 10
     response_latency = 10
+#    mshrs = 2
+#    tgts_per_mshr = 2
+#    write_buffers = 2
     mshrs = 20
     tgts_per_mshr = 12
     write_buffers = 8
@@ -77,6 +83,9 @@ class L3Cache(Cache):
     tag_latency = 30
     data_latency = 30
     response_latency = 30
+#    mshrs = 2
+#    tgts_per_mshr = 2
+#    write_buffers = 2
     mshrs = 512
     tgts_per_mshr = 16
     write_buffers = 8

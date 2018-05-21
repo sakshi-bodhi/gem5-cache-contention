@@ -182,6 +182,14 @@ MasterPort::sendFunctional(PacketPtr pkt)
     return _slavePort->recvFunctional(pkt);
 }
 
+void
+MasterPort::addPort2Q(PacketPtr pkt, uint64_t portType)
+{
+//	std::cout << "Trace masterport::getcachestatus\n";
+    return _slavePort->addPort2Queue(pkt, portType);
+
+}
+
 bool
 MasterPort::sendTimingReq(PacketPtr pkt)
 {
@@ -214,7 +222,7 @@ MasterPort::sendTimingReq(PacketPtr pkt)
 //      std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tRequest" << "\n";
       addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "Req", false, 2);
       //-----CHANGED----
-      std::cout << curTick() << "\tTrace " << name() << " sendTimingReq(port.cc):\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
+//      std::cout << curTick() << "\tTrace " << name() << " sendTimingReq(port.cc):\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
 
     return _slavePort->recvTimingReq(pkt);
 }
@@ -228,7 +236,7 @@ MasterPort::sendTimingSnoopResp(PacketPtr pkt)
 //    std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tSnoopResp" << "\n";
     addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "SnoopResp", false, 2);
     //-----CHANGED----
-    std::cout << curTick() << "\tTrace " << name() << " sendTimingSnoopResp(port.cc):\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
+//    std::cout << curTick() << "\tTrace " << name() << " sendTimingSnoopResp(port.cc):\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
 
     return _slavePort->recvTimingSnoopResp(pkt);
 }
@@ -241,7 +249,7 @@ MasterPort::sendRetryResp()
 //	        	std::cout << "Packet=" << pkt->getAddr() << "\tMasterPort::sendRetryResp()\t" << name() << "\tcurTick: "<< curTick() << "\n";
 //	        }
 	    //    -----CHANGED----
-    std::cout << curTick() << "\tTrace " << name() << " sendRetryResp(port.cc):\n";
+//    std::cout << curTick() << "\tTrace " << name() << " sendRetryResp(port.cc):\n";
 
     _slavePort->recvRespRetry();
 }
@@ -320,7 +328,7 @@ SlavePort::sendTimingResp(PacketPtr pkt)
 //      std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tResponse" << "\n";
       addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "Resp", false, 2);
       //-----CHANGED----
-      std::cout << curTick() << "\tTrace " << name() << " sendTimingResp(port.cc):\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
+//      std::cout << curTick() << "\tTrace " << name() << " sendTimingResp(port.cc):\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
 
     return _masterPort->recvTimingResp(pkt);
 }
@@ -335,7 +343,7 @@ SlavePort::sendTimingSnoopReq(PacketPtr pkt)
       addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "SnoopReq", false, 2);
       //-----CHANGED----
 
-      std::cout << curTick() << "\tTrace " << name() << " sendTimingSnoopReq(port.cc):\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
+//      std::cout << curTick() << "\tTrace " << name() << " sendTimingSnoopReq(port.cc):\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
 
     _masterPort->recvTimingSnoopReq(pkt);
 }
@@ -349,7 +357,7 @@ SlavePort::sendRetryReq()
 //	        }
 	    //    -----CHANGED----
 
-    std::cout << curTick() << "\tTrace " << name() << " sendRetryReq(port.cc):\n";
+//    std::cout << curTick() << "\tTrace " << name() << " sendRetryReq(port.cc):\n";
 
     _masterPort->recvReqRetry();
 }
@@ -357,7 +365,7 @@ SlavePort::sendRetryReq()
 void
 SlavePort::sendRetrySnoopResp()
 {
-    std::cout << curTick() << "\tTrace " << name() << " sendRetrySnoopResp(port.cc):\n";
+//    std::cout << curTick() << "\tTrace " << name() << " sendRetrySnoopResp(port.cc):\n";
 
     _masterPort->recvRetrySnoopResp();
 }

@@ -138,7 +138,7 @@ BaseSetAssoc::findBlockBySetAndWay(int set, int way) const
 
 std::string
 BaseSetAssoc::print() const {
-	std::cout<<"Inside PRINT\t" << numSets << "\t" << assoc << "\n";
+	std::cout<<"#Sets: " << numSets << "\tAssoc: " << assoc << "\n";
     std::string cache_state;
     for (unsigned i = 0; i < numSets; ++i) {
         // link in the data blocks

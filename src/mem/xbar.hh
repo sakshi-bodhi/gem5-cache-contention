@@ -54,6 +54,7 @@
 #include <deque>
 #include <unordered_map>
 
+#include "mem/cache/base.hh"
 #include "base/addr_range_map.hh"
 #include "base/types.hh"
 #include "mem/mem_object.hh"
@@ -73,7 +74,7 @@
 class BaseXBar : public MemObject
 {
 
-  protected:
+protected:
 
     /**
      * A layer is an internal crossbar arbitration point with its own
@@ -94,6 +95,7 @@ class BaseXBar : public MemObject
     {
 
       public:
+    	bool nextLevelCacheStatus;
 
         /**
          * Create a layer and give it a name. The layer uses

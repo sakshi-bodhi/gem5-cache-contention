@@ -54,6 +54,7 @@
 #include <list>
 #include <string>
 #include <vector>
+#include <queue>
 
 #include "base/misc.hh"
 #include "base/statistics.hh"
@@ -79,6 +80,7 @@
 	static MSHRQueue* ptrTol3ReqQueue = NULL;
 	static WriteQueue* ptrTol3WBReqQueue = NULL;
 
+
 /**
  * A basic cache interface. Implements some common functions for speed.
  */
@@ -95,6 +97,13 @@ class BaseCache : public MemObject
 
   public:
 
+
+    class portTypeQueue {
+    public:
+    	uint64_t rid;
+    	uint64_t portType;
+    };
+
     /**
      * Reasons for caches to be blocked.
      */
@@ -102,6 +111,7 @@ class BaseCache : public MemObject
         Blocked_NoMSHRs = MSHRQueue_MSHRs,
         Blocked_NoWBBuffers = MSHRQueue_WriteBuffer,
         Blocked_NoTargets,
+        Cache_Busy,
         NUM_BLOCKED_CAUSES
     };
 
@@ -134,13 +144,20 @@ class BaseCache : public MemObject
             //------CHANGED------
         }
 
+        bool isMustSendRespRetry() const { return mustSendRespRetry; }
+
+        void clearMustSendRespRetry() { mustSendRespRetry = false; }
+
       protected:
+
+        bool mustSendRespRetry;
 
         CacheMasterPort(const std::string &_name, BaseCache *_cache,
                         ReqPacketQueue &_reqQueue,
-                        SnoopRespPacketQueue &_snoopRespQueue) :
-            QueuedMasterPort(_name, _cache, _reqQueue, _snoopRespQueue)
-        { }
+                        SnoopRespPacketQueue &_snoopRespQueue);
+//            QueuedMasterPort(_name, _cache, _reqQueue, _snoopRespQueue),
+//            mustSendRespRetry(false), sendRespRetryEvent(this)
+//        { }
 
         /**
          * Memory-side port always snoops.
@@ -148,6 +165,15 @@ class BaseCache : public MemObject
          * @return always true
          */
         virtual bool isSnooping() const { return true; }
+
+
+//      private:
+//
+//        void processSendRespRetry();
+//
+//        EventWrapper<CacheMasterPort,
+//        			 &CacheMasterPort::processSendRespRetry> sendRespRetryEvent;
+
     };
 
     /**
@@ -171,6 +197,12 @@ class BaseCache : public MemObject
 
         bool isBlocked() const { return blocked; }
 
+        bool isMustSendRetry() const { return mustSendRetry; }
+
+        void clearMustSendRetry() { mustSendRetry = false; }
+
+        Tick portUnblockAt;
+
       protected:
 
         CacheSlavePort(const std::string &_name, BaseCache *_cache,
@@ -191,6 +223,12 @@ class BaseCache : public MemObject
                      &CacheSlavePort::processSendRetry> sendRetryEvent;
 
     };
+
+    void processCacheUnblock();
+
+    EventWrapper<BaseCache,
+                 &BaseCache::processCacheUnblock> cacheUnblockEvent;
+
 
     CacheSlavePort *cpuSidePort;
     CacheMasterPort *memSidePort;
@@ -336,6 +374,16 @@ class BaseCache : public MemObject
     const AddrRangeList addrRanges;
 
   public:
+
+
+    std::deque<portTypeQueue> addRetryPortToQueue;	// add retry type port where to send retry requests - cpuside port (1) or memside port (2)
+
+    /* blocking the cache access if it is servicing a request */
+    bool cacheAccessBusy;
+
+    Tick allowCacheAccessAt;
+
+    bool blockedCauseChanged;
 
     //--------CHANGED----------
        	MSHRQueue l3ReqQueue;	//stores the requests in all the mshrs of L2 caches
@@ -491,6 +539,12 @@ class BaseCache : public MemObject
     virtual BaseSlavePort &getSlavePort(const std::string &if_name,
                                         PortID idx = InvalidPortID);
 
+    uint64_t findNextRetryPort();
+
+    void printPortSideQueue();
+
+    bool canAddPort2Queue(PacketPtr pkt, uint64_t portType);
+
     /**
      * Query block size of a cache.
      * @return  The block size
@@ -519,8 +573,10 @@ class BaseCache : public MemObject
         //--------CHANGED----------
         if(cacheName.find("l2") != std::string::npos) {
 //     	   std::cout << curTick() << "\t" << pkt->getAddr() <<" -> Packet came into global mshr_queue for cache " << cacheName << "\n";
-        	ptrTol3ReqQueue->allocateL3RQ(mshr, cacheName);
-//        	ptrTol3ReqQueue->dump();
+        	if(pkt->isRead() || pkt->isWrite() || pkt->cmd == MemCmd::WritebackDirty) {
+            	ptrTol3ReqQueue->allocateL3RQ(mshr, cacheName);
+    //        	ptrTol3ReqQueue->dump();
+        	}
         }
         //--------CHANGED----------
 
@@ -530,7 +586,7 @@ class BaseCache : public MemObject
 
         if (sched_send) {
             // schedule the send
-//      	   std::cout << curTick() << "\tschedMemSideEvent for " << cacheName << "\t" << time << "\n";
+//      	   std::cout << curTick() << "\tTrace schedMemSideEvent from MSHR of " << cacheName << "\t at " << time << "\n";
             schedMemSideSendEvent(time);
         }
 
@@ -551,11 +607,15 @@ class BaseCache : public MemObject
         }
 
         WriteQueueEntry *wq_entry_new = writeBuffer.allocate(blk_addr, blkSize, pkt, time, order++);
+
+//        std::cout << "Cache level: " << name() << "\n";
         //--------CHANGED----------
         if(cacheName.find("l2") != std::string::npos) {
-     	   std::cout << curTick() << "\t" << pkt->getAddr() <<" -> Packet came into global wb_queue for cache " << cacheName << "\n";
-        	ptrTol3WBReqQueue->allocateL3RQ(wq_entry_new, cacheName);
-//        	ptrTol3WBReqQueue->dump();
+        	if(pkt->isRead() || pkt->isWrite() || pkt->cmd == MemCmd::WritebackDirty) {
+        		//     	   std::cout << curTick() << "\t" << pkt->getAddr() <<" -> Packet came into global wb_queue for cache " << cacheName << "\n";
+        		        	ptrTol3WBReqQueue->allocateL3RQ(wq_entry_new, cacheName);
+        		//        	ptrTol3WBReqQueue->dump();
+        	}
         }
         //--------CHANGED----------
 
@@ -570,6 +630,27 @@ class BaseCache : public MemObject
     /**
      * Returns true if the cache is blocked for accesses.
      */
+
+    bool isCacheAccessBusy() const
+    {
+    	return cacheAccessBusy;
+    }
+
+    void setCacheAccessBusy()
+    {
+//    	std::cout << "Trace changing cache status of " << name() << " cache from " << cacheAccessBusy << " to true\n";
+    	cacheAccessBusy = true;
+//    	cpuSidePort->portUnblockAt = allowCacheAccessAt;
+    	schedule(cacheUnblockEvent, allowCacheAccessAt);
+//    	std::cout << curTick() << "\t" << name() << "\tTrace (setBlockCacheAccess()) scheduling an event to unblock cache at " << allowCacheAccessAt << " ticks\n";
+    }
+
+    void clearCacheAccessBusy()
+    {
+    	cacheAccessBusy = false;
+//        std::cout << curTick() << "\tTrace clearBlockCacheAccess " << name() << "\n";
+    }
+
     bool isBlocked() const
     {
         return blocked != 0;
@@ -582,6 +663,7 @@ class BaseCache : public MemObject
      */
     void setBlocked(BlockedCause cause)
     {
+//    	std::cout << curTick() << "\t" << name() << "\t Trace setting the cache blocked!\n";
         uint8_t flag = 1 << cause;
         if (blocked == 0) {
             blocked_causes[cause]++;
@@ -601,6 +683,7 @@ class BaseCache : public MemObject
      */
     void clearBlocked(BlockedCause cause)
     {
+//    	std::cout << curTick() << "\t" << name() << "\t Trace clearing the blocked cache!\n";
         uint8_t flag = 1 << cause;
         blocked &= ~flag;
         DPRINTF(Cache,"Unblocking for cause %d, mask=%d\n", cause, blocked);
@@ -609,6 +692,102 @@ class BaseCache : public MemObject
             cpuSidePort->clearBlocked();
         }
     }
+
+//    bool isCacheAccessBusy() const
+//    {
+//    	return cacheAccessBusy;
+//    }
+//
+//    void setCacheAccessBusy()
+//    {
+//    	std::cout << "Trace changing cache status of " << name() << " cache from " << cacheAccessBusy << " to true\n";
+//    	if(blocked == 0) {
+//    		cacheAccessBusy = true;
+//    		setBlocked(Cache_Busy);
+//    		cpuSidePort->portUnblockAt = allowCacheAccessAt;
+//    		schedule(cacheUnblockEvent, allowCacheAccessAt);
+//    		std::cout << curTick() << "\tTrace (setBlockCacheAccess()) scheduling an event to unblock " << name() << "\t at " << allowCacheAccessAt << " ticks\n";
+//    	}
+//    	else {
+//    		std::cout << curTick() << " Trace Cache is already blocked!\n";
+//    	}
+//    }
+//
+//    void clearCacheAccessBusy()
+//    {
+//    	clearBlocked(Cache_Busy);
+//    	cacheAccessBusy = false;
+//        std::cout << curTick() << "\tTrace clearBlockCacheAccess " << name() << "\n";
+////    	std::cout << curTick() << " Trace changing cache status of " << name() << " cache from " << blockCacheAccess << " to ";
+////    	std::cout << blockCacheAccess << "\n";
+//    }
+//
+//    bool isBlocked() const
+//    {
+//        return blocked != 0;
+//    }
+//
+//    /**
+//     * Marks the access path of the cache as blocked for the given cause. This
+//     * also sets the blocked flag in the slave interface.
+//     * @param cause The reason for the cache blocking.
+//     */
+//    void setBlocked(BlockedCause cause)
+//    {
+//        uint8_t flag = 1 << cause;
+//        std::cout << curTick() <<  "\t" << name() << "\t Trace set cause: " << cause << "\n";
+//        std::cout << curTick() << "\t Trace set flag: " << unsigned(flag) << "\t blocked before: " << unsigned(blocked) << "\n";
+//        if(cacheAccessBusy && cause != Cache_Busy) {
+//        	blockedCauseChanged = true;
+//        	std::cout << curTick() << "\t Trace set changed cause: " << cause << "\n";
+//        	blocked = 0;		//making it zero to change the cause of blocking the cache
+//            blocked_causes[cause]++;
+//            blockedCycle = curCycle();
+//        }
+//        else if (blocked == 0) {
+//            blocked_causes[cause]++;
+//            blockedCycle = curCycle();
+//            cpuSidePort->setBlocked();
+//        }
+//        blocked |= flag;
+//        std::cout << curTick() << "\t Trace set blocked after: " << unsigned(blocked) << "\n";
+////        std::cout << name () << " Trace setBlocked flag: " << flag << "\t blocked: " << blocked << "\tcause: " << cause << "\n";
+//        DPRINTF(Cache,"Blocking for cause %d, mask=%d\n", cause, blocked);
+//    }
+//
+//    /**
+//     * Marks the cache as unblocked for the given cause. This also clears the
+//     * blocked flags in the appropriate interfaces.
+//     * @param cause The newly unblocked cause.
+//     * @warning Calling this function can cause a blocked request on the bus to
+//     * access the cache. The cache must be in a state to handle that request.
+//     */
+//    void clearBlocked(BlockedCause cause)
+//    {
+//    	if(cause != Cache_Busy) {
+//    		std::cout << curTick() << "\t" << name() << "\t Trace clearing cache blocked after status is changed!\n";
+//    	}
+//        uint8_t flag = 1 << cause;
+//        std::cout << curTick() << "\t" << name() <<  "\t Trace clear cause: " << cause << "\n";
+//        std::cout << curTick() << "\t Trace clear flag: " << unsigned(flag) << "\t blocked before: " << unsigned(blocked) << "\n";
+//        blocked &= ~flag;
+//        std::cout << curTick() << "\t Trace clear blocked after: " << unsigned(blocked) << "\n";
+////        std::cout << name () << " Trace clearBlocked flag: " << unsigned(flag) << "\t blocked: " << unsigned(blocked) << "\tcause: " << cause << "\n";
+//        DPRINTF(Cache,"Unblocking for cause %d, mask=%d\n", cause, blocked);
+//
+//        if(blocked == 0 && blockedCauseChanged) {
+//            blocked_cycles[cause] += curCycle() - blockedCycle;
+//        	blockedCauseChanged = false;
+//        }
+//        else {
+//        	std::cout << curTick() << "\t Trace clear reached inside if 1\n";
+//            blocked_cycles[cause] += curCycle() - blockedCycle;
+//    		cpuSidePort->portUnblockAt = curTick()+(1*clockPeriod());
+//            cacheAccessBusy = false;
+//            cpuSidePort->clearBlocked();
+//            std::cout << curTick() << "\t Trace clear reached inside 11\n";
+//        }
+//    }
 
     /**
      * Schedule a send event for the memory-side port. If already

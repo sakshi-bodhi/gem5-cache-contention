@@ -227,6 +227,14 @@ class MasterPort : public BaseMasterPort
     */
     bool sendTimingReq(PacketPtr pkt);
 
+//    /* reading the cache access status */
+//
+//    bool getCacheStatus();
+
+    /* adding retry port type (request/response) to the queue*/
+
+    void addPort2Q(PacketPtr pkt, uint64_t portType);
+
     /**
      * Attempt to send a timing snoop response packet to the slave
      * port by calling its corresponding receive function. If the send
@@ -455,6 +463,22 @@ class SlavePort : public BaseSlavePort
      */
     virtual bool recvTimingReq(PacketPtr pkt) = 0;
 
+//    virtual bool sendCacheStatus()
+//    {
+////        panic("%s was not expecting a call here\n", name());
+////    	std::cout << "Trace " << name() << " (inside port.hh) slaveport::sendCacheStatus ---> NOT A CACHE!!\n";
+//    	return false;
+//    }
+
+  public:
+    virtual void addPort2Queue(PacketPtr pkt, uint64_t portType)
+    {
+//        panic("%s was not expecting a call here\n", name());
+//    	std::cout << "Trace " << name() << " (inside port.hh) slaveport::sendCacheStatus ---> NOT A CACHE!!\n";
+    	return;
+    }
+
+protected:
     /**
      * Receive a timing snoop response from the master port.
      */

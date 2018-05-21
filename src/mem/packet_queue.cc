@@ -167,6 +167,8 @@ PacketQueue::schedSendEvent(Tick when)
         when = std::max(when, curTick() + 1);
         // @todo Revisit the +1
 
+//        std::cout << curTick() << "\tTrace (packet_queue) scheduling an event at " << when << "\n";
+
         if (!sendEvent.scheduled()) {
             em.schedule(&sendEvent, when);
         } else if (when < sendEvent.when()) {
@@ -194,7 +196,7 @@ PacketQueue::sendDeferredPacket()
     assert(!waitingOnRetry);
     assert(deferredPacketReady());
 
-    std::cout << curTick() << "\tTrace " << name() << "\tat sendDefferedPacket from respQueue (PktQueue)\n";
+//    std::cout << curTick() << "\tTrace " << name() << "\tat sendDefferedPacket from respQueue (PktQueue)\n";
 
     DeferredPacket dp = transmitList.front();
 
