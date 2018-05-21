@@ -1681,7 +1681,6 @@ Cache::recvTimingResp(PacketPtr pkt)
                 pkt->print());
     }
 
-
     if(isCacheAccessBusy()) {
     	cpuSidePort->addPort2Queue(pkt, 2);
 //    	addRetryPortToQueue.push_back(2);
@@ -1934,7 +1933,11 @@ Cache::recvTimingResp(PacketPtr pkt)
             // Reset the bus additional time as it is now accounted for
             tgt_pkt->headerDelay = tgt_pkt->payloadDelay = 0;
 //            std::cout << "completion_time (before sending a resp) " << completion_time << "\n";
-            cpuSidePort->schedTimingResp(tgt_pkt, completion_time, true);
+
+            if(name().find("icache") == std::string::npos && name().find("dcache") == std::string::npos)
+            {
+            	cpuSidePort->schedTimingResp(tgt_pkt, completion_time, true);
+            }
             break;
 
           case MSHR::Target::FromPrefetcher:
@@ -3348,6 +3351,13 @@ Cache::MemSidePort::recvTimingResp(PacketPtr pkt)
 	addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "Resp", false, 2);
 
 	bool success;
+
+
+    if(pkt->req->isResponseForwarded()) {
+        cache->cpuSidePort->schedTimingResp(pkt, curTick(), true);
+		pkt->req->setRespForwarded(false);
+        return true;
+    }
 
 	if(mustSendRespRetry) {
     	cache->cpuSidePort->addPort2Queue(pkt, 2);

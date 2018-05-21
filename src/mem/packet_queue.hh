@@ -75,10 +75,25 @@ class PacketQueue : public Drainable
         {}
     };
 
+    /** A deferred packet, buffered to forward later. */
+    class ForwardDeferredPacket {
+      public:
+        Tick tick;      ///< The tick when the packet is ready to transmit
+        PacketPtr pkt;  ///< Pointer to the packet to transmit
+        ForwardDeferredPacket(Tick t, PacketPtr p)
+            : tick(t), pkt(p)
+        {}
+    };
+
     typedef std::list<DeferredPacket> DeferredPacketList;
+
+    typedef std::list<ForwardDeferredPacket> ForwardDeferredPacketList;
 
     /** A list of outgoing packets. */
     DeferredPacketList transmitList;
+
+    /** A list of outgoing packets whose response is being forwarded */
+    ForwardDeferredPacketList forwardedList;
 
     /** The manager which is used for the event queue */
     EventManager& em;
@@ -86,8 +101,15 @@ class PacketQueue : public Drainable
     /** Used to schedule sending of deferred packets. */
     void processSendEvent();
 
+    /** Used to schedule forwarding of response of deferred packets. */
+    void processForwardEvent();
+
     /** Event used to call processSendEvent. */
     EventWrapper<PacketQueue, &PacketQueue::processSendEvent> sendEvent;
+
+    /** Event used to call processForwardEvent. */
+        EventWrapper<PacketQueue, &PacketQueue::processForwardEvent> forwardEvent;
+
 
      /*
       * Optionally disable the sanity check
@@ -189,6 +211,13 @@ class PacketQueue : public Drainable
      * @param force_order Force insertion order for packets with same address
      */
     void schedSendTiming(PacketPtr pkt, Tick when, bool force_order = false);
+
+
+    /**
+     * Add a packet to the forwarded list, and schedule a send event.
+     */
+    void schedSendFwdTiming(PacketPtr pkt, Tick when);
+
 
     /**
      * Retry sending a packet from the queue. Note that this is not

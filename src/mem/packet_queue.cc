@@ -51,7 +51,7 @@ using namespace std;
 
 PacketQueue::PacketQueue(EventManager& _em, const std::string& _label,
                          bool disable_sanity_check)
-    : em(_em), sendEvent(this), _disableSanityCheck(disable_sanity_check),
+    : em(_em), sendEvent(this), forwardEvent(this), _disableSanityCheck(disable_sanity_check),
       label(_label), waitingOnRetry(false)
 {
 }
@@ -99,6 +99,32 @@ PacketQueue::checkFunctional(PacketPtr pkt)
     pkt->popLabel();
 
     return found;
+}
+
+void
+PacketQueue::schedSendFwdTiming(PacketPtr pkt, Tick when) {
+
+    assert(when >= curTick());
+
+    if (forwardedList.empty()) {
+    	forwardedList.emplace_front(when, pkt);
+//        em.schedule(&forwardEvent, when);
+        if (!forwardEvent.scheduled()) {
+            em.schedule(&forwardEvent, when);
+        } else if (when < forwardEvent.when()) {
+            em.reschedule(&forwardEvent, when);
+        }
+        return;
+    }
+    auto i = forwardedList.end();
+    --i;
+    while (i != forwardedList.begin() && when < i->tick &&
+           !(i->pkt->getAddr() == pkt->getAddr()))
+        --i;
+
+    // emplace inserts the element before the position pointed to by
+    // the iterator, so advance it one step
+    forwardedList.emplace(++i, when, pkt);
 }
 
 void
@@ -209,6 +235,7 @@ PacketQueue::sendDeferredPacket()
 
     // use the appropriate implementation of sendTiming based on the
     // type of queue
+	dp.pkt->req->setRespForwarded(false);
     waitingOnRetry = !sendTiming(dp.pkt);
 
     // if we succeeded and are not waiting for a retry, schedule the
@@ -218,6 +245,29 @@ PacketQueue::sendDeferredPacket()
     } else {
         // put the packet back at the front of the list
         transmitList.emplace_front(dp);
+    }
+}
+
+void
+PacketQueue::processForwardEvent()
+{
+    ForwardDeferredPacket fdp = forwardedList.front();
+
+    forwardedList.pop_front();
+    Tick forwardAt;
+	fdp.pkt->req->setRespForwarded(true);
+    if(sendTiming(fdp.pkt)) {
+    	forwardAt = forwardedList.empty() ? MaxTick : forwardedList.front().tick;
+    }
+    else {
+        // put the packet back at the front of the list
+        forwardedList.emplace_front(fdp);
+		forwardAt= curTick() + fdp.pkt->headerDelay;
+    }
+    if (!forwardEvent.scheduled()) {
+        em.schedule(&forwardEvent, forwardAt);
+    } else if (forwardAt < forwardEvent.when()) {
+        em.reschedule(&forwardEvent, forwardAt);
     }
 }
 
