@@ -188,7 +188,7 @@ std::vector<coreStatus> last_entry_vector;
 
 //variables
 bool recordStatusFlag = false;
-bool recordL3StatusFlag = false;
+bool recordL3StatusFlag = true;
 
 uint64_t writeAfter = 1000;
 uint64_t writeAfter1 = 1000;

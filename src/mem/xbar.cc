@@ -175,6 +175,7 @@ void BaseXBar::Layer<SrcType,DstType>::occupyLayer(Tick until)
 
 //    std::cout << curTick() << "\t" << name() << " Trace LFCB occupied layer! until " << until << "\n";
 //    std::cout << curTick() << "\tTrace " << name() << " occupyLayer(xbar.cc): Layer is occupied until:\t" << until << "\n";
+//  	std::cout <<curTick() << "\t" << name() << " waitingForLayer size " << waitingForLayer.size() << "\tElements are: ";
     DPRINTF(PktTrace, "%s: occupyLayer(xbar.cc): Layer is occupied until:\t %ld\n", name(), until);
 
     // account for the occupied ticks
@@ -220,6 +221,17 @@ BaseXBar::Layer<SrcType,DstType>::tryTiming(SrcType* src_port)
 
 
         waitingForLayer.push_back(src_port);
+//        if(name().find("tol3bus") != std::string::npos) {
+//        	std::cout <<curTick() << "\t try timing: bus name: " << name() << " waitingForLayer size " << waitingForLayer.size() << "\n";
+//        	for(int i = 0; i < waitingForLayer.size(); i++) {
+//        		std::cout << " " << waitingForLayer.at(i)->getId();
+//        	}
+//        	std::cout << "\n";
+//        	if(waitingForPeer != NULL)
+//        		std::cout << "waitingForPeer " << waitingForPeer->getId()  << "\n";
+//
+//    //        std::cout << "retrying port id taken " << retryingPort->getId() << "\t" << retryingPort->name() << "\n";
+//        }
 
 //        std::cout << curTick() << "\t" << name() << "\tTrace Layer is busy. Push port id " << src_port->getId() << "\n";
 //       	std::cout <<curTick() << "\t" << name() << " Trace LFCB waitingForLayer size " << waitingForLayer.size() << "\tElements are: ";
@@ -350,45 +362,50 @@ BaseXBar::Layer<SrcType,DstType>::retryWaiting()
 //    if(retryingPort->name().find("tol3bus.slave") != std::string::npos) {
 //    	std::cout <<curTick() << "\t bus name: " << name() << " waitingForLayer size " << waitingForLayer.size() << "\n";
 //    	for(int i = 0; i < waitingForLayer.size(); i++) {
-//    		std::cout << ' ' << waitingForLayer.at(i)->getId();
+//    		std::cout << " " << waitingForLayer.at(i)->getId();
 //    	}
 //    	std::cout << "\n";
-//        std::cout << "retrying port id taken " << retryingPort->getId() << "\n";
+////        std::cout << "retrying port id taken " << retryingPort->getId() << "\t" << retryingPort->name() << "\n";
 //    }
-//
-//    //--------PRINTS----------
+////
+////    //--------PRINTS----------
 
 
 //    //-------PRIORITIZATION-------------
 //
-//    if(retryingPort->name().find("tol3bus.slave") != std::string::npos) {
-////    if(retryingPort->name().find("tol3bus") != std::string::npos) {
-//    	int priority = getPriority();
-////
-////    	//--------PRINTS----------
-////    	std::cout << "retrying port id taken before priority " << retryingPort->getId() << "\n";
-////    	if(priority==0)
-////    		std::cout << "Ports 0,1,2,3 will get priority\n";
-////    	else
-////    		std::cout << "Ports 4,5,6,7 will get priority\n";
-////        //--------PRINTS----------
+
+//	std::cout << curTick() << "\t" << name() << " Retry Waiting \n";
+
+    if(retryingPort->name().find("tol3bus.slave") != std::string::npos) {
+//    	std::cout << curTick() << "\t" << name() << " Retry Waiting l3 bus slave\n";
+//    if(retryingPort->name().find("tol3bus") != std::string::npos) {
+    	int priority = getPriority();
+
+//    	//--------PRINTS----------
+//    	std::cout << "retrying port id taken before priority " << retryingPort->getId() << "\n";
+//    	if(priority==0)
+//    		std::cout << "Ports 0,1,2,3 will get priority\n";
+//    	else
+//    		std::cout << "Ports 4,5,6,7 will get priority\n";
+//        //--------PRINTS----------
+
+    	retryingPort = findPrioritizedPort(priority, retryingPort);
+
+//    	//--------PRINTS----------
+//    	std::cout << "retrying port id taken after priority " << retryingPort->getId() << "\n";
 //
-//    	retryingPort = findPrioritizedPort(priority, retryingPort);
-////    	//--------PRINTS----------
-////    	std::cout << "retrying port id taken after priority " << retryingPort->getId() << "\n";
-////
-////        std::cout << "waitingForLayer size " << waitingForLayer.size() << "(after prioritization deque looks like)\n";
-////        for(int i = 0; i < waitingForLayer.size(); i++) {
-////        	std::cout << ' ' << waitingForLayer.at(i)->getId();
-////        }
-////        std::cout << "\n";
-////        //--------PRINTS----------
-//}
+//        std::cout << "waitingForLayer size " << waitingForLayer.size() << "(after prioritization deque looks like)\n";
+//        for(int i = 0; i < waitingForLayer.size(); i++) {
+//        	std::cout << ' ' << waitingForLayer.at(i)->getId();
+//        }
+//        std::cout << "\n";
+//        //--------PRINTS----------
+}
     //-------PRIORITIZATION-------------
 
-//        if(retryingPort->name().find("tol3bus.slave") != std::string::npos) {
-//        	retryingCore(retryingPort->getId());
-//        }
+        if(retryingPort->name().find("tol3bus.slave") != std::string::npos) {
+        	retryingCore(retryingPort->getId());
+        }
 //        std::cout << curTick() << "\t" << name() << " Trace retryWaiting(xbar.cc): retrying port is\t" << retryingPort->getId() << "\n";
     waitingForLayer.pop_front();
     //--------Changed----------
@@ -407,6 +424,17 @@ BaseXBar::Layer<SrcType,DstType>::retryWaiting()
     // tell the port to retry, which in some cases ends up calling the
     // layer again
     sendRetry(retryingPort);
+
+//    if(retryingPort->name().find("tol3bus.slave") != std::string::npos) {
+//    	std::cout <<curTick() << "\t bus name: " << name() << " waitingForLayer size " << waitingForLayer.size() << "\n";
+//    	for(int i = 0; i < waitingForLayer.size(); i++) {
+//    		std::cout << " " << waitingForLayer.at(i)->getId();
+//    	}
+//    	std::cout << "\n";
+//    	if(waitingForPeer != NULL)
+//    		std::cout << "waitingForPeer " << waitingForPeer->getId()  << "\n";
+////        std::cout << "retrying port id taken " << retryingPort->getId() << "\t" << retryingPort->name() << "\n";
+//    }
 
     // If the layer is still in the retry state, sendTiming wasn't
     // called in zero time (e.g. the cache does this when a writeback
@@ -444,6 +472,17 @@ BaseXBar::Layer<SrcType,DstType>::recvRetry()
     //--------CHANGED-------
 
     waitingForLayer.push_front(waitingForPeer);
+//	std::cout <<curTick() << "\t push waitingForPeer to WFL: bus name: " << name() << " waitingForLayer size " << waitingForLayer.size() << "\n";
+
+//    if(name().find("tol3bus") != std::string::npos) {
+//    	std::cout <<curTick() << "\t push waitingForPeer to WFL: bus name: " << name() << " waitingForLayer size " << waitingForLayer.size() << "\n";
+//    	for(int i = 0; i < waitingForLayer.size(); i++) {
+//    		std::cout << " " << waitingForLayer.at(i)->getId();
+//    	}
+//    	std::cout << "\n";
+//    	if(waitingForPeer != NULL)
+//    		std::cout << "waitingForPeer " << waitingForPeer->getId()  << "\n";
+//    }
 //    std::cout << curTick() << "\tpushFront\t" << waitingForLayer.size() << "\t" << layerLastFreeAt << "\t" << layerBusyFor << "\t" << name() << "\n";
 
     // we are no longer waiting for the peer

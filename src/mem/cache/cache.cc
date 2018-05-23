@@ -405,7 +405,6 @@ Cache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
 //    }
 
 
-
     ContextID id = pkt->req->hasContextId() ?
         pkt->req->contextId() : InvalidContextID;
     // Here lat is the value passed as parameter to accessBlock() function
@@ -853,9 +852,10 @@ Cache::recvTimingReq(PacketPtr pkt)
 //        if(name().find("l3") != std::string::npos) {
         	allowCacheAccessAt = clockEdge(forwardLatency) + pkt->headerDelay;
     		setCacheAccessBusy();
-            if(name().find("l3") != std::string::npos) {
-            	std::cout << curTick() << "\t" << name() << "\tRequest " << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
-            }
+    		bringPort2Top(pkt, 1);
+//            if(name().find("l3") != std::string::npos) {
+//            	std::cout << curTick() << "\t" << name() << "\tRequest " << pkt->getAddr() << "\t" << pkt->req->rid << "\n";
+//            }
 //        }
 	}
 	else {
@@ -1307,12 +1307,12 @@ Cache::recvTimingReq(PacketPtr pkt)
         }
     }
 
-    std::cout << curTick() << "\tCache getting request\t" << name() << "\t" << pkt->getAddr() << "\t" << pkt->req << "\t" << pkt->req->rid << "\t" << pkt->req->masterId() << "\n";
-//
-//
-    std::cout << "**********Printing Cache status after REQUEST***********\n";
-    std::cout << tags->print();
-    std::cout << "******************\n";
+//    std::cout << curTick() << "\tCache getting request\t" << name() << "\t" << pkt->getAddr() << "\t" << pkt->req << "\t" << pkt->req->rid << "\t" << pkt->req->masterId() << "\n";
+////
+////
+//    std::cout << "**********Printing Cache status after REQUEST***********\n";
+//    std::cout << tags->print();
+//    std::cout << "******************\n";
 
     if (next_pf_time != MaxTick)
         schedMemSideSendEvent(next_pf_time);
@@ -1664,7 +1664,7 @@ Cache::recvTimingResp(PacketPtr pkt)
 //    	isL2Cache = false;
 //    }
 
-    std::cout << curTick() << "\tTrace " << name() << " recvTimingResp(cache.cc):\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
+//    std::cout << curTick() << "\tTrace " << name() << " recvTimingResp(cache.cc):\t" << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
 
   	//-----------CHANGED----------
     assert(pkt->isResponse());
@@ -1681,6 +1681,7 @@ Cache::recvTimingResp(PacketPtr pkt)
                 pkt->print());
     }
 
+
     if(isCacheAccessBusy()) {
     	cpuSidePort->addPort2Queue(pkt, 2);
 //    	addRetryPortToQueue.push_back(2);
@@ -1693,9 +1694,9 @@ Cache::recvTimingResp(PacketPtr pkt)
 //    	std::cout << "Forward latency " << (clockEdge(forwardLatency) +pkt->payloadDelay) << "\n";
 //    	std::cout << "payLoad latency " << pkt->payloadDelay << " headerDelay " << pkt->headerDelay << "\n";
     	setCacheAccessBusy();
-        if(name().find("l3") != std::string::npos) {
-        	std::cout << curTick() << "\t" << name() << "\tResponse " << pkt->getAddr() << "\t" << pkt->req->rid << "\t" << pkt->req->getseqNum() << "\n";
-        }
+//        if(name().find("l3") != std::string::npos) {
+//        	std::cout << curTick() << "\t" << name() << "\tResponse " << pkt->getAddr() << "\t" << pkt->req->rid << "\n";
+//        }
     }
 
     DPRINTF(Cache, "%s: Handling response %s\n", __func__,
@@ -1933,11 +1934,7 @@ Cache::recvTimingResp(PacketPtr pkt)
             // Reset the bus additional time as it is now accounted for
             tgt_pkt->headerDelay = tgt_pkt->payloadDelay = 0;
 //            std::cout << "completion_time (before sending a resp) " << completion_time << "\n";
-
-            if(name().find("icache") == std::string::npos && name().find("dcache") == std::string::npos)
-            {
-            	cpuSidePort->schedTimingResp(tgt_pkt, completion_time, true);
-            }
+            cpuSidePort->schedTimingResp(tgt_pkt, completion_time, true);
             break;
 
           case MSHR::Target::FromPrefetcher:
@@ -1974,9 +1971,9 @@ Cache::recvTimingResp(PacketPtr pkt)
     }
 
 
-    std::cout <<"**********Printing Cache status after RESPONSE***********\n";
-    std::cout << tags->print();
-    std::cout << "******************\n";
+//    std::cout <<"**********Printing Cache status after RESPONSE***********\n";
+//    std::cout << tags->print();
+//    std::cout << "******************\n";
 
     DPRINTF(DelayPath, "%#llx \t %#llx \t %#llx \t %s \t Response\n", curTick(), pkt->req->rid, pkt->getAddr(),name());
     addToDelayPath(pkt->req->rid, pkt->getAddr(), forward_time, name()+".access", "Resp", false, 2);
@@ -3214,7 +3211,7 @@ Cache::CpuSidePort::getAddrRanges() const
 void
 Cache::CpuSidePort::addPort2Queue(PacketPtr pkt, uint64_t portType)
 {
-//    	std::cout << curTick() << "\t" << name() << "\tcan Add in PortQ? " << pkt->req->rid << "\t" << portType << "\n";
+    	std::cout << curTick() << "\t" << name() << "\tcan Add in PortQ? " << pkt->req->rid << "\t" << portType << "\n";
 //    	cache->printPortSideQueue();
 	if(cache->canAddPort2Queue(pkt, portType)) {
 		portTypeQueue ptq;
@@ -3224,7 +3221,8 @@ Cache::CpuSidePort::addPort2Queue(PacketPtr pkt, uint64_t portType)
 	}
 
 //    if(name().find("l3") != std::string::npos) {
-//    	cache->printPortSideQueue();
+//    	std::cout << "Updated port queue at L3: \n";
+    	cache->printPortSideQueue();
 //    }
 }
 
@@ -3351,13 +3349,6 @@ Cache::MemSidePort::recvTimingResp(PacketPtr pkt)
 	addToDelayPath(pkt->req->rid, pkt->getAddr(), curTick(), name(), "Resp", false, 2);
 
 	bool success;
-
-
-    if(pkt->req->isResponseForwarded()) {
-        cache->cpuSidePort->schedTimingResp(pkt, curTick(), true);
-		pkt->req->setRespForwarded(false);
-        return true;
-    }
 
 	if(mustSendRespRetry) {
     	cache->cpuSidePort->addPort2Queue(pkt, 2);

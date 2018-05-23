@@ -47,7 +47,6 @@
 
 #include "mem/packet_queue.hh"
 #include "mem/port.hh"
-#include "sim/clocked_object.hh"
 
 /**
  * A queued port is a port that has an infinite queue for outgoing
@@ -96,25 +95,7 @@ class QueuedSlavePort : public SlavePort
      * @param when Absolute time (in ticks) to send packet
      */
     void schedTimingResp(PacketPtr pkt, Tick when, bool force_order = false)
-    {
-    	if(!pkt->req->isResponseGenerated())    //  Response came just now. We will forward it to the pipeline also write it to each level upstream.
-    	{
-    		Tick forwardAt= curTick() + pkt->headerDelay;
-        	respQueue.schedSendFwdTiming(pkt, forwardAt);
-    		respQueue.schedSendTiming(pkt, when, force_order);
-    		pkt->req->setResponseGenerated(true);	// subsequent calls for schedTimingResp() for this packet will either be forwarded or be transmitted
-			pkt->req->setRespForwarded(true);
-    	}
-    	else {
-    		if(pkt->req->isResponseForwarded()) {
-    			Tick forwardAt= curTick() + pkt->headerDelay;
-    			respQueue.schedSendFwdTiming(pkt, forwardAt);
-    		}
-        	else {
-        		respQueue.schedSendTiming(pkt, when, force_order);
-        	}
-    	}
-    }
+    { respQueue.schedSendTiming(pkt, when, force_order); }
 
     /** Check the list of buffered packets against the supplied
      * functional request. */

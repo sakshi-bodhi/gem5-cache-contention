@@ -539,6 +539,8 @@ class BaseCache : public MemObject
     virtual BaseSlavePort &getSlavePort(const std::string &if_name,
                                         PortID idx = InvalidPortID);
 
+    int findPrioritizedPort(int priority, int retryingPort);
+
     uint64_t findNextRetryPort();
 
     void printPortSideQueue();
@@ -625,6 +627,32 @@ class BaseCache : public MemObject
 
         // schedule the send
         schedMemSideSendEvent(time);
+    }
+
+
+    /**
+     * In case of port prioritization at xbar, this function
+     * brings the prioritized port (packet) entry in addRetryPortToQueue
+     * at the top, such that, the packets waiting are from the same
+     * ports which are waiting for xbar in waitingForLayer queue.
+     */
+
+    void bringPort2Top(PacketPtr pkt, uint64_t portType) {
+
+    	int i;
+    	for(i = 0; i < addRetryPortToQueue.size(); i++)
+    	{
+    		if(addRetryPortToQueue.at(i).rid == pkt->req->rid && addRetryPortToQueue.at(i).portType == portType) {
+    			addRetryPortToQueue.push_front(addRetryPortToQueue.at(i));
+    			addRetryPortToQueue.erase(addRetryPortToQueue.begin()+(i+1));
+    			break;
+    		}
+    		else {
+    			continue;
+    		}
+    	}
+    	std::cout << "Port queue after prioritization\n";
+    	printPortSideQueue();
     }
 
     /**

@@ -69,7 +69,7 @@ static float T1 = 0;	//total requests serviced from group 1
 static float T2 = 0;	//total requests serviced from group 2
 static float O1 = 0;	//total outstanding requests present in the queue from group 1
 static float O2 = 0;	//total outstanding requests present in the queue from group 2
-float priRatio=9;
+float priRatio=0.111;
 int numCores=8;
 // For T1:T2. eg. if ratio is 8:2 => 8/2 = 4
 

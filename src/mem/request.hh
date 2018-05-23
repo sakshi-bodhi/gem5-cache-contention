@@ -243,10 +243,6 @@ class Request
 
     //--------CHANGED--------
     uint64_t rid;	// unique request id
-
-    bool responseGenerated;		// set this when we get the response for this request
-
-    bool isRespForwarded;	// to check if the response for this request is already forwarded towards cpu side.
     //--------CHANGED--------
 
 
@@ -379,21 +375,6 @@ class Request
     	sn = _reqInstSeqNum;
     	return sn;
     }
-
-    void setResponseGenerated(bool val) {
-    	responseGenerated = val;
-    }
-
-    bool isResponseGenerated() {
-    	return responseGenerated;
-    }
-
-    bool isResponseForwarded() {
-    	return isRespForwarded;
-    }
-    void setRespForwarded(bool fwded) {
-    	isRespForwarded = fwded;
-    }
     //---------CHANGED-----------
 
 
@@ -410,8 +391,6 @@ class Request
           accessDelta(0), depth(0)
     {
     	setRid();
-    	setRespForwarded(false);
-    	setResponseGenerated(false);
     }
 
     Request(Addr paddr, unsigned size, Flags flags, MasterID mid,
@@ -423,8 +402,6 @@ class Request
           accessDelta(0), depth(0)
     {
     	setRid();
-    	setRespForwarded(false);
-    	setResponseGenerated(false);
         setPhys(paddr, size, flags, mid, curTick());
         setContext(cid);
         privateFlags.set(VALID_INST_SEQ_NUM);
@@ -443,8 +420,6 @@ class Request
           accessDelta(0), depth(0)
     {
     	setRid();
-    	setRespForwarded(false);
-    	setResponseGenerated(false);
         setPhys(paddr, size, flags, mid, curTick());
     }
 
@@ -456,8 +431,6 @@ class Request
           accessDelta(0), depth(0)
     {
     	setRid();
-    	setRespForwarded(false);
-    	setResponseGenerated(false);
         setPhys(paddr, size, flags, mid, time);
     }
 
@@ -470,8 +443,6 @@ class Request
           accessDelta(0), depth(0)
     {
     	setRid();
-    	setRespForwarded(false);
-    	setResponseGenerated(false);
         setPhys(paddr, size, flags, mid, time);
         privateFlags.set(VALID_PC);
     }
@@ -485,8 +456,6 @@ class Request
           accessDelta(0), depth(0)
     {
     	setRid();
-    	setRespForwarded(false);
-    	setResponseGenerated(false);
 //   	   std::cout << "LOADREQ vaddr (I/D) " << vaddr << " Req id " << rid << "\n";
         setVirt(asid, vaddr, size, flags, mid, pc);
         setContext(cid);
@@ -497,8 +466,6 @@ class Request
         : atomicOpFunctor(atomic_op), missedLLC(false)
     {
     	setRid();
-    	setRespForwarded(false);
-    	setResponseGenerated(false);
         setVirt(asid, vaddr, size, flags, mid, pc);
         setContext(cid);
     }
