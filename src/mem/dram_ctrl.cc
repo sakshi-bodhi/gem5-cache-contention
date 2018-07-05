@@ -300,6 +300,7 @@ DRAMCtrl::readQueueFull(unsigned int neededEntries) const
             readBufferSize, readQueue.size() + respQueue.size(),
             neededEntries);
 
+    std::cout << curTick() << "\t" << name() << "\tDRAM read and write buffer sizes: " << readBufferSize << "\t" << writeBufferSize << "\n";
     return
         (readQueue.size() + respQueue.size() + neededEntries) > readBufferSize;
 }

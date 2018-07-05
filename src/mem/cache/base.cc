@@ -212,8 +212,8 @@ BaseCache::processCacheUnblock()
 //    	std::cout << "Cache is free!\n";
     }
 
-    std::cout << curTick() <<  "\t" << name() << " portSideQueue status (after sending a retry)\n";
-    printPortSideQueue();
+//    std::cout << curTick() <<  "\t" << name() << " portSideQueue status (after sending a retry)\n";
+//    printPortSideQueue();
 }
 
 
@@ -260,14 +260,14 @@ BaseCache::printPortSideQueue() {
 
 bool
 BaseCache::canAddPort2Queue(PacketPtr pkt, uint64_t portType) {
-	std::cout << curTick() << "\tAdding in PortQ " << pkt->req->rid << "\t" << portType << "\n";
-	for(int i = 0; i < addRetryPortToQueue.size(); i++) {
-			std::cout << curTick() << "\tPortQ " << addRetryPortToQueue.at(i).rid << "\t" << addRetryPortToQueue.at(i).portType << "\n";
-	}
+//	std::cout << curTick() << "\tAdding in PortQ " << pkt->req->rid << "\t" << portType << "\n";
+//	for(int i = 0; i < addRetryPortToQueue.size(); i++) {
+//			std::cout << curTick() << "\tPortQ " << addRetryPortToQueue.at(i).rid << "\t" << addRetryPortToQueue.at(i).portType << "\n";
+//	}
 	for(int i = 0; i < addRetryPortToQueue.size(); i++) {
 //		std::cout << curTick() << "\tPortQ " << addRetryPortToQueue.at(i).rid << "\t" << addRetryPortToQueue.at(i).portType << "\n";
 		if(addRetryPortToQueue.at(i).rid == pkt->req->rid && addRetryPortToQueue.at(i).portType == portType) {
-			std::cout << "Already there... Cannot be added\n";
+//			std::cout << "Already there... Cannot be added\n";
 			return false;
 		}
 	}

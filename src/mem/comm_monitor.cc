@@ -266,6 +266,7 @@ CommMonitor::recvTimingReq(PacketPtr pkt)
 
     // If not successful, restore the sender state
     if (!successful && expects_response && !stats.disableLatencyHists) {
+    	std::cout << name() << "\t recvTimingReq commMonitor\n";
         delete pkt->popSenderState();
     }
 

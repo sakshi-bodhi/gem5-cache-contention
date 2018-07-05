@@ -304,6 +304,10 @@ class Packet : public Printable
     /// A pointer to the original request.
     const RequestPtr req;
 
+    bool isForwarded;
+
+    bool isCacheForwarded;
+
   private:
    /**
     * A pointer to the data being transfered.  It can be differnt
@@ -582,7 +586,10 @@ class Packet : public Printable
      * WritebackClean false      Exclusive
      * WritebackClean true       Shared
      */
-    void setHasSharers()    { flags.set(HAS_SHARERS); }
+    void setHasSharers()    {
+//        std:: cout << curTick() << "\tsetHasShareres " << req->rid << "\t" << flags << "\t" << data << "\t" << commandInfo[cmd].str "\n";
+    	std:: cout << curTick() << "\tsetHasShareres " << req->rid << "\t" << flags << "\t" << data << "\n";
+    	flags.set(HAS_SHARERS); }
     bool hasSharers() const { return flags.isSet(HAS_SHARERS); }
     //@}
 
@@ -701,7 +708,7 @@ class Packet : public Printable
      * not be valid. The command must be supplied.
      */
     Packet(const RequestPtr _req, MemCmd _cmd)
-        :  cmd(_cmd), req(_req), data(nullptr), addr(0), _isSecure(false),
+        :  cmd(_cmd), req(_req), isForwarded(false), isCacheForwarded(false), data(nullptr), addr(0), _isSecure(false),
            size(0), headerDelay(0), snoopDelay(0), payloadDelay(0),
            senderState(NULL)
     {
@@ -725,7 +732,7 @@ class Packet : public Printable
      * req.  this allows for overriding the size/addr of the req.
      */
     Packet(const RequestPtr _req, MemCmd _cmd, int _blkSize)
-        :  cmd(_cmd), req(_req), data(nullptr), addr(0), _isSecure(false),
+        :  cmd(_cmd), req(_req), isForwarded(false), isCacheForwarded(false), data(nullptr), addr(0), _isSecure(false),
            headerDelay(0), snoopDelay(0), payloadDelay(0),
            senderState(NULL)
     {
@@ -750,7 +757,7 @@ class Packet : public Printable
      * packet should allocate its own data.
      */
     Packet(const PacketPtr pkt, bool clear_flags, bool alloc_data)
-        :  cmd(pkt->cmd), req(pkt->req),
+        :  cmd(pkt->cmd), req(pkt->req), isForwarded(false), isCacheForwarded(false),
            data(nullptr),
            addr(pkt->addr), _isSecure(pkt->_isSecure), size(pkt->size),
            bytesValid(pkt->bytesValid),

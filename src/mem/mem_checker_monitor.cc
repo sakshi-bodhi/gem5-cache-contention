@@ -183,6 +183,7 @@ MemCheckerMonitor::recvTimingReq(PacketPtr pkt)
 
     // If not successful, restore the sender state
     if (!successful && expects_response && (is_read || is_write)) {
+    	std::cout << name() << "\t recvTimingReq memCheckerMonitor\n";
         delete pkt->popSenderState();
     }
 

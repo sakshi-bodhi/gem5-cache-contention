@@ -1304,6 +1304,9 @@ DefaultIEW<Impl>::executeInsts()
         // Execute instruction.
         // Note that if the instruction faults, it will be handled
         // at the commit stage.
+
+        std::cout << curTick() << "\t" << name() << "\tinst is: " << inst->staticInst->disassemble(inst->pcState().instAddr()) << "\t" << inst->pcState() << "\t" << inst->seqNum << "\n";
+
         if (inst->isMemRef()) {
             DPRINTF(IEW, "Execute: Calculating address for memory "
                     "reference.\n");

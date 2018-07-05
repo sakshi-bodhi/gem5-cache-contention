@@ -75,10 +75,25 @@ class PacketQueue : public Drainable
         {}
     };
 
+    /** A deferred packet, buffered to forward later. */
+    class ForwardDeferredPacket {
+      public:
+        Tick tick;      ///< The tick when the packet is ready to transmit
+        PacketPtr pkt;  ///< Pointer to the packet to transmit
+        ForwardDeferredPacket(Tick t, PacketPtr p)
+            : tick(t), pkt(p)
+        {}
+    };
+
     typedef std::list<DeferredPacket> DeferredPacketList;
+
+    typedef std::list<ForwardDeferredPacket> ForwardDeferredPacketList;
 
     /** A list of outgoing packets. */
     DeferredPacketList transmitList;
+
+    /** A list of outgoing packets whose response is being forwarded */
+    ForwardDeferredPacketList forwardedList;
 
     /** The manager which is used for the event queue */
     EventManager& em;

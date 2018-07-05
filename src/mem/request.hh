@@ -458,7 +458,9 @@ class Request
     	setRid();
 //   	   std::cout << "LOADREQ vaddr (I/D) " << vaddr << " Req id " << rid << "\n";
         setVirt(asid, vaddr, size, flags, mid, pc);
+        std::cout << curTick() << "\t" << rid << "\t" << asid << "\t" << vaddr << "\t" << size << "\t" << flags << "\t" << mid << "\t" << pc << "\n";
         setContext(cid);
+        std::cout << curTick() << "\t" << rid << "\t" << asid << "\t" << vaddr << "\t" << size << "\t" << flags << "\t" << mid << "\t" << pc << "\t" << cid << "\n";
     }
 
     Request(int asid, Addr vaddr, unsigned size, Flags flags, MasterID mid,

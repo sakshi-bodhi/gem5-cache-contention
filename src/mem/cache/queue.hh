@@ -88,9 +88,11 @@ class Queue : public Drainable
 
     /**  Actual storage. */
     std::vector<Entry> entries;
+
+  public:
     /** Holds pointers to all allocated entries. */
     typename Entry::List allocatedList;
-  public:
+
     /** Holds pointers to entries that haven't been sent downstream. */
     typename Entry::List readyList;
   protected:

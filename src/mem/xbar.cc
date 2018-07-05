@@ -359,14 +359,14 @@ BaseXBar::Layer<SrcType,DstType>::retryWaiting()
 //    std::cout << curTick() << " retryingPort id" << retryingPort->getId() << " retryingPort name" << retryingPort->name()  << "\n";
 
 //    //--------PRINTS----------
-//    if(retryingPort->name().find("tol3bus.slave") != std::string::npos) {
-//    	std::cout <<curTick() << "\t bus name: " << name() << " waitingForLayer size " << waitingForLayer.size() << "\n";
-//    	for(int i = 0; i < waitingForLayer.size(); i++) {
-//    		std::cout << " " << waitingForLayer.at(i)->getId();
-//    	}
-//    	std::cout << "\n";
+    if(retryingPort->name().find("tol3bus.slave") != std::string::npos) {
+    	std::cout <<curTick() << "\t bus name: " << name() << " waitingForLayer size " << waitingForLayer.size() << "\n";
+    	for(int i = 0; i < waitingForLayer.size(); i++) {
+    		std::cout << " " << waitingForLayer.at(i)->getId();
+    	}
+    	std::cout << "\n";
 ////        std::cout << "retrying port id taken " << retryingPort->getId() << "\t" << retryingPort->name() << "\n";
-//    }
+    }
 ////
 ////    //--------PRINTS----------
 
@@ -375,32 +375,32 @@ BaseXBar::Layer<SrcType,DstType>::retryWaiting()
 //
 
 //	std::cout << curTick() << "\t" << name() << " Retry Waiting \n";
-
-    if(retryingPort->name().find("tol3bus.slave") != std::string::npos) {
-//    	std::cout << curTick() << "\t" << name() << " Retry Waiting l3 bus slave\n";
-//    if(retryingPort->name().find("tol3bus") != std::string::npos) {
-    	int priority = getPriority();
-
-//    	//--------PRINTS----------
-//    	std::cout << "retrying port id taken before priority " << retryingPort->getId() << "\n";
-//    	if(priority==0)
-//    		std::cout << "Ports 0,1,2,3 will get priority\n";
-//    	else
-//    		std::cout << "Ports 4,5,6,7 will get priority\n";
-//        //--------PRINTS----------
-
-    	retryingPort = findPrioritizedPort(priority, retryingPort);
-
-//    	//--------PRINTS----------
-//    	std::cout << "retrying port id taken after priority " << retryingPort->getId() << "\n";
 //
-//        std::cout << "waitingForLayer size " << waitingForLayer.size() << "(after prioritization deque looks like)\n";
-//        for(int i = 0; i < waitingForLayer.size(); i++) {
-//        	std::cout << ' ' << waitingForLayer.at(i)->getId();
-//        }
-//        std::cout << "\n";
-//        //--------PRINTS----------
-}
+//    if(retryingPort->name().find("tol3bus.slave") != std::string::npos) {
+////    	std::cout << curTick() << "\t" << name() << " Retry Waiting l3 bus slave\n";
+////    if(retryingPort->name().find("tol3bus") != std::string::npos) {
+//    	int priority = getPriority();
+//
+////    	//--------PRINTS----------
+////    	std::cout << "retrying port id taken before priority " << retryingPort->getId() << "\n";
+////    	if(priority==0)
+////    		std::cout << "Ports 0,1,2,3 will get priority\n";
+////    	else
+////    		std::cout << "Ports 4,5,6,7 will get priority\n";
+////        //--------PRINTS----------
+//
+//    	retryingPort = findPrioritizedPort(priority, retryingPort);
+//
+////    	//--------PRINTS----------
+////    	std::cout << "retrying port id taken after priority " << retryingPort->getId() << "\n";
+////
+////        std::cout << "waitingForLayer size " << waitingForLayer.size() << "(after prioritization deque looks like)\n";
+////        for(int i = 0; i < waitingForLayer.size(); i++) {
+////        	std::cout << ' ' << waitingForLayer.at(i)->getId();
+////        }
+////        std::cout << "\n";
+////        //--------PRINTS----------
+//}
     //-------PRIORITIZATION-------------
 
         if(retryingPort->name().find("tol3bus.slave") != std::string::npos) {

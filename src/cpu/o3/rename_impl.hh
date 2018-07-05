@@ -633,6 +633,9 @@ DefaultRename<Impl>::renameInsts(ThreadID tid)
         //For load instruction, check LQ size and take into account the inflight loads
         //For store instruction, check SQ size and take into account the inflight stores
 
+        std::cout << curTick() << "\t" << name() << "\tinst is: " << inst->staticInst->disassemble(inst->pcState().instAddr()) << "\t" << inst->pcState() << "\t" << inst->seqNum << "\n";
+
+
         if (inst->isLoad()) {
             if (calcFreeLQEntries(tid) <= 0) {
                 DPRINTF(Rename, "[tid:%u]: Cannot rename due to no free LQ\n");

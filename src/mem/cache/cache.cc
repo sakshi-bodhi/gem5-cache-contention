@@ -200,6 +200,9 @@ Cache::satisfyRequest(PacketPtr pkt, CacheBlk *blk,
     // assert(!pkt->needsWritable() || blk->isWritable());
     assert(pkt->getOffset(blkSize) + pkt->getSize() <= blkSize);
 
+
+    std ::cout << curTick() << "\t" << name() << "\t satisfyRequest 1 " << pkt->req->rid << "\t" << *(blk->data) << "\t" << blk->task_id << "\t" << blk->asid << "\t" << blk->tag << "\t" << blk->set << "\t" << blk->way << "\t" << blk->size << "\t" << blk->status << "\n" ;
+
     // Check RMW operations first since both isRead() and
     // isWrite() will be true for them
     if (pkt->cmd == MemCmd::SwapReq) {
@@ -214,6 +217,8 @@ Cache::satisfyRequest(PacketPtr pkt, CacheBlk *blk,
         if (blk->checkWrite(pkt)) {
             pkt->writeDataToBlock(blk->data, blkSize);
         }
+
+        std ::cout << curTick() << "\t" << name() << "\t satisfyRequest 2 " << pkt->req->rid << "\t" << *(blk->data) << "\t" << blk->task_id << "\t" << blk->asid << "\t" << blk->tag << "\t" << blk->set << "\t" << blk->way << "\t" << blk->size << "\t" << blk->status << "\n" ;
         // Always mark the line as dirty (and thus transition to the
         // Modified state) even if we are a failed StoreCond so we
         // supply data to any snoops that have appended themselves to
@@ -229,6 +234,7 @@ Cache::satisfyRequest(PacketPtr pkt, CacheBlk *blk,
         assert(pkt->hasRespData());
         pkt->setDataFromBlock(blk->data, blkSize);
 
+        std ::cout << curTick() << "\t" << name() << "\t satisfyRequest 3 " << pkt->req->rid << "\t" << *(blk->data) << "\t" << blk->task_id << "\t" << blk->asid << "\t" << blk->tag << "\t" << blk->set << "\t" << blk->way << "\t" << blk->size << "\t" << blk->status << "\n" ;
         // determine if this read is from a (coherent) cache or not
         if (pkt->fromCache()) {
             assert(pkt->getSize() == blkSize);
@@ -246,6 +252,8 @@ Cache::satisfyRequest(PacketPtr pkt, CacheBlk *blk,
                     pkt->setCacheResponding();
                     blk->status &= ~BlkDirty;
                 }
+                std ::cout << curTick() << "\t" << name() << "\t satisfyRequest 3.1 " << pkt->req->rid << "\t" << blk->status << "\n" ;
+
             } else if (blk->isWritable() && !pending_downgrade &&
                        !pkt->hasSharers() &&
                        pkt->cmd != MemCmd::ReadCleanReq) {
@@ -282,6 +290,8 @@ Cache::satisfyRequest(PacketPtr pkt, CacheBlk *blk,
                         // and first snoop upwards in all other
                         // branches
                         blk->status &= ~BlkDirty;
+                        std ::cout << curTick() << "\t" << name() << "\t satisfyRequest 3.2.1 " << pkt->req->rid << "\t" << blk->status << "\n" ;
+
                     } else {
                         // if we're responding after our own miss,
                         // there's a window where the recipient didn't
@@ -289,11 +299,13 @@ Cache::satisfyRequest(PacketPtr pkt, CacheBlk *blk,
                         // have responded to snoops correctly, so we
                         // have to respond with a shared line
                         pkt->setHasSharers();
+                        std ::cout << curTick() << "\t" << name() << "\t satisfyRequest 3.2.2 " << pkt->req->rid << "\t" << *(blk->data) << "\t" << blk->task_id << "\t" << blk->asid << "\t" << blk->tag << "\t" << blk->set << "\t" << blk->way << "\t" << blk->size << "\t" << blk->status << "\n" ;
                     }
                 }
             } else {
                 // otherwise only respond with a shared copy
                 pkt->setHasSharers();
+                std ::cout << curTick() << "\t" << name() << "\t satisfyRequest 5 " << pkt->req->rid << "\t" << *(blk->data) << "\t" << blk->task_id << "\t" << blk->asid << "\t" << blk->tag << "\t" << blk->set << "\t" << blk->way << "\t" << blk->size << "\t" << blk->status << "\n" ;
             }
         }
     } else if (pkt->isUpgrade()) {
@@ -997,6 +1009,7 @@ Cache::recvTimingReq(PacketPtr pkt)
             // just as lookupLatency or or the value of lat overriden
             // by access(), that calls accessBlock() function.
             cpuSidePort->schedTimingResp(pkt, request_time, true);
+            std::cout << curTick() << "\t" << name() << "\trequest ptr " << pkt->req << "\t" << pkt->req->rid << "\tblock " << blk << " hit in cache\n";
             //-----CHANGED----
 //                      std::cout << "Cache::recvTimingReq(): schedule timing response (in respQueue) for pkt="<< pkt << " and request time="<< request_time <<"\n";
             //-----CHANGED----
@@ -1016,6 +1029,7 @@ Cache::recvTimingReq(PacketPtr pkt)
         //-----CHANGED----
 //                  std::cout << "Cache::recvTimingReq(): access() returns satisfied="<< satisfied << " i.e. miss in the cache\n";
         //-----CHANGED----
+//    	std ::cout << curTick() << "\t" << name() << "\t Cache access " << pkt->data << "\t" << blkSize << "\n" ;
 
         DPRINTF(DelayPath, "%#llx \t %#llx \t %#llx \t %s \t Request\n", curTick(), pkt->req->rid, pkt->getAddr(),name());
         addToDelayPath(pkt->req->rid, pkt->getAddr(), forward_time, name()+".access", "Req", false, 0);
@@ -1036,6 +1050,8 @@ Cache::recvTimingReq(PacketPtr pkt)
         // uncacheable request
         MSHR *mshr = pkt->req->isUncacheable() ? nullptr :
             mshrQueue.findMatch(blk_addr, pkt->isSecure());
+
+        std::cout << curTick() << "\t" << name() << "\trequest ptr " << pkt->req << "\t" << pkt->req->rid << "\tblock " << blk_addr << " miss in cache\n";
 
         //-----CHANGED----
 //                  std::cout << "Cache::recvTimingReq(): blk_addr="<< blk_addr << " mshrQueue num in service="<< mshrQueue.numInService() <<"\n";
@@ -1118,6 +1134,9 @@ Cache::recvTimingReq(PacketPtr pkt)
                     // delay of the xbar.
                     mshr->allocateTarget(pkt, forward_time, order++,
                                          allocOnFill(pkt->cmd));
+
+                    std::cout << curTick() << "\t" << name() << "\trequest ptr " << pkt->req << "\t" << pkt->req->rid << "\tblock " << blk_addr << "\tMSHR hit\n";
+
                     if (mshr->getNumTargets() == numTarget) {
                         noTargetMSHR = mshr;
                         setBlocked(Blocked_NoTargets);
@@ -1143,6 +1162,7 @@ Cache::recvTimingReq(PacketPtr pkt)
         } else {
             // no MSHR
 
+        	std::cout << curTick() << "\t" << name() << "\trequest ptr " << pkt->req << "\t" << pkt->req->rid << "\tblock " << blk_addr << "\tMSHR miss\n";
 //            if(name().find("l2") != std::string::npos) {
 //            	std::cout << curTick() << "\tTHROU access() MSHR miss l2: pkt " << pkt->getAddr() << "\n";
 //    //        	calcThroughput();
@@ -1193,109 +1213,7 @@ Cache::recvTimingReq(PacketPtr pkt)
 //                if(!name().compare("system.cpu0.dcache")) {
 //                	std::cout << "MASTERID CPU0 d- " << pkt->req->masterId() << "\n";
 //                }
-//                if(!name().compare("system.cpu0.icache")) {
-//                	std::cout << "MASTERID CPU0 i- " << pkt->req->masterId() << "\n";
-//                }
-//                if(!name().compare("system.cpu1.dcache")) {
-//                	std::cout << "MASTERID CPU1 d- " << pkt->req->masterId() << "\n";
-//                }
-//                if(!name().compare("system.cpu1.icache")) {
-//                	std::cout << "MASTERID CPU1 i- " << pkt->req->masterId() << "\n";
-//                }
-//                if(!name().compare("system.cpu2.dcache")) {
-//                	std::cout << "MASTERID CPU2 d- " << pkt->req->masterId() << "\n";
-//                }
-//                if(!name().compare("system.cpu2.icache")) {
-//                	std::cout << "MASTERID CPU2 i- " << pkt->req->masterId() << "\n";
-//                }
-//                if(!name().compare("system.cpu3.dcache")) {
-//                	std::cout << "MASTERID CPU3 d- " << pkt->req->masterId() << "\n";
-//                }
-//                if(!name().compare("system.cpu3.icache")) {
-//                	std::cout << "MASTERID CPU3 i- " << pkt->req->masterId() << "\n";
-//                }
-//                if(!name().compare("system.cpu4.dcache")) {
-//                	std::cout << "MASTERID CPU4 d- " << pkt->req->masterId() << "\n";
-//                }
-//                if(!name().compare("system.cpu4.icache")) {
-//                	std::cout << "MASTERID CPU4 i- " << pkt->req->masterId() << "\n";
-//                }
-//                if(!name().compare("system.cpu5.dcache")) {
-//                	std::cout << "MASTERID CPU5 d- " << pkt->req->masterId() << "\n";
-//                }
-//                if(!name().compare("system.cpu5.icache")) {
-//                	std::cout << "MASTERID CPU5 i- " << pkt->req->masterId() << "\n";
-//                }
-//                if(!name().compare("system.cpu6.dcache")) {
-//                	std::cout << "MASTERID CPU6 d- " << pkt->req->masterId() << "\n";
-//                }
-//                if(!name().compare("system.cpu6.icache")) {
-//                	std::cout << "MASTERID CPU6 i- " << pkt->req->masterId() << "\n";
-//                }
-//                if(!name().compare("system.cpu7.dcache")) {
-//                	std::cout << "MASTERID CPU7 d- " << pkt->req->masterId() << "\n";
-//                }
-//                if(!name().compare("system.cpu7.icache")) {
-//                	std::cout << "MASTERID CPU7 i- " << pkt->req->masterId() << "\n";
-//                }
-
-
-//                if(!name().compare("system.cpu.icache")) {
-//                	//std::cout << "system.cpu0.dcache\n";
-//                	std::cout << "CPU i- Total MSHR entries " << mshrQueue.totalMSHRentries << "\n";
-//                	std::cout << "CPU i- Total MSHR Delay " << mshrQueue.totalMSHRDelay<< "\n";
-//                }
-//                if(!name().compare("system.cpu.dcache")) {
-//                	//std::cout << "system.cpu0.dcache\n";
-//                	std::cout << "CPU d- Total MSHR entries " << mshrQueue.totalMSHRentries << "\n";
-//                	std::cout << "CPU d- Total MSHR Delay " << mshrQueue.totalMSHRDelay<< "\n";
-//                }
-//                if(!name().compare("system.cpu0.dcache")) {
-//                	//std::cout << "system.cpu0.dcache\n";
-//                	std::cout << "CPU0 d- Total MSHR entries " << mshrQueue.totalMSHRentries << "\n";
-//                	std::cout << "CPU0 d- Total MSHR Delay " << mshrQueue.totalMSHRDelay<< "\n";
-//                }
-//                if(!name().compare("system.cpu0.icache")) {
-////                	std::cout << "system.cpu0.icache\n";
-//                	std::cout << "CPU0 i- Total MSHR entries " << mshrQueue.totalMSHRentries << "\n";
-//                	std::cout << "CPU0 i- Total MSHR Delay " << mshrQueue.totalMSHRDelay<< "\n";
-//                }
-//                if(!name().compare("system.cpu1.dcache")) {
-////                	std::cout << "system.cpu1.dcache\n";
-//                	std::cout << "CPU1 d- Total MSHR entries " << mshrQueue.totalMSHRentries << "\n";
-//                	std::cout << "CPU1 d- Total MSHR Delay " << mshrQueue.totalMSHRDelay<< "\n";
-//                }
-//                if(!name().compare("system.cpu1.icache")) {
-////                	std::cout << "system.cpu1.icache\n";
-//                	std::cout << "CPU1 i- Total MSHR entries " << mshrQueue.totalMSHRentries << "\n";
-//                	std::cout << "CPU1 i- Total MSHR Delay " << mshrQueue.totalMSHRDelay<< "\n";
-//                }
-//                if(!name().compare("system.cpu2.dcache")) {
-////                	std::cout << "system.cpu2.dcache\n";
-//                	std::cout << "CPU2 d- Total MSHR entries " << mshrQueue.totalMSHRentries << "\n";
-//                	std::cout << "CPU2 d- Total MSHR Delay " << mshrQueue.totalMSHRDelay<< "\n";
-//                }
-//                if(!name().compare("system.cpu2.icache")) {
-////                	std::cout << "system.cpu2.icache\n";
-//                	std::cout << "CPU2 i- Total MSHR entries " << mshrQueue.totalMSHRentries << "\n";
-//                	std::cout << "CPU2 i- Total MSHR Delay " << mshrQueue.totalMSHRDelay<< "\n";
-//                }
-//                if(!name().compare("system.cpu3.dcache")) {
-////                	std::cout << "system.cpu3.dcache\n";
-//                	std::cout << "CPU3 d- Total MSHR entries " << mshrQueue.totalMSHRentries << "\n";
-//                	std::cout << "CPU3 d- Total MSHR Delay " << mshrQueue.totalMSHRDelay<< "\n";
-//                }
-//                if(!name().compare("system.cpu3.icache")) {
-////                	std::cout << "system.cpu3.icache\n";
-//                	std::cout << "CPU3 i- Total MSHR entries " << mshrQueue.totalMSHRentries << "\n";
-//                	std::cout << "CPU3 i- Total MSHR Delay " << mshrQueue.totalMSHRDelay<< "\n";
-//                }
-//                if(!name().compare("system.l2")) {
-////                	std::cout << "system.l2\n";
-//                	std::cout << "L2- Total MSHR entries " << mshrQueue.totalMSHRentries << "\n";
-//                	std::cout << "L2- Total MSHR Delay " << mshrQueue.totalMSHRDelay<< "\n";
-//                }
-                //-----------CHANGED----------
+//               // -----------CHANGED----------
                 allocateMissBuffer(pkt, forward_time, name());
             }
 
@@ -1380,6 +1298,8 @@ Cache::createMissPacket(PacketPtr cpu_pkt, CacheBlk *blk,
         // of date, however, there is no harm in conservatively
         // assuming the block has sharers
         pkt->setHasSharers();
+        std ::cout << curTick() << "\t" << name() << "\t createMissPacket 1 " << cpu_pkt->req->rid << "\t" << *(blk->data) << "\t" << blk->task_id << "\t" << blk->asid << "\t" << blk->tag << "\t" << blk->set << "\t" << blk->way << "\t" << blk->size << "\t" << blk->status << "\n" ;
+        std ::cout << curTick() << "\t" << name() << "\t createMissPacket 2 " << pkt->req->rid << "\t" << *(blk->data) << "\t" << blk->task_id << "\t" << blk->asid << "\t" << blk->tag << "\t" << blk->set << "\t" << blk->way << "\t" << blk->size << "\t" << blk->status << "\n" ;
         DPRINTF(Cache, "%s: passing hasSharers from %s to %s\n",
                 __func__, cpu_pkt->print(), pkt->print());
     }
@@ -1654,7 +1574,7 @@ Cache::recvTimingResp(PacketPtr pkt)
     //-----------CHANGED----------
 //	std::cout << "recvTimingResp cache name(): " << name() << "packet\t" << pkt->getAddr() << "\n";
     //-----CHANGED----
-//      std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tResponse" << "\n";
+      std::cout << "delay_path \tStage1 \t" << curTick() << "\t" << pkt->req->getSize() << "\t" << pkt->req->rid << "\t" << pkt->getAddr() << "\t" << name() << "\tResponse" << "\n";
 
      //-----CHANGED----
 //    if((name().find("l2") != std::string::npos)) {
@@ -1681,6 +1601,42 @@ Cache::recvTimingResp(PacketPtr pkt)
                 pkt->print());
     }
 
+    if(pkt->isForwarded) {
+    	Cycles forwardingLatency = Cycles(1);
+    	pkt->headerDelay = 0;
+
+        MSHR *mshr=NULL;
+        std::cout << curTick() <<"  ----------MSHR contains-----------\n";
+        std::cout << name() << "\tmshrQueue size: " << mshrQueue.allocatedList.size() << "\tSearching entry " << pkt->req->rid << "\n";
+        for (auto i = mshrQueue.allocatedList.begin(); i != mshrQueue.allocatedList.end(); ++i) {
+        	std::cout << curTick() << "\tmshr " << *i << "\t" << (*i)->getTarget()->pkt->req->rid << "\n";
+        	if((*i)->getTarget()->pkt->req->rid == pkt->req->rid) {
+        		mshr = *i;
+    //    		std::cout << name() << "\tmshr entry found " << mshr->getTarget()->pkt->req->rid<< "\n";
+        	}
+        }
+
+
+    	MSHR::TargetList targets = mshr->extractServiceableTargets(pkt);
+    			for (auto &target: targets) {
+    	        Packet *tgt_pkt = target.pkt;
+
+    	        PacketPtr pkt1 = new Packet(tgt_pkt->req, pkt->cmd, pkt->getSize());
+    	//        if (pkt->hasSharers() && !pkt->needsWritable()) {
+    	//            pkt1->setHasSharers();
+    	//        }
+    	        pkt1->allocate();
+//    	        pkt->writeData(pkt1->getPtr<uint8_t>());
+    	        pkt1->setData(pkt->getConstPtr<uint8_t>());
+//        std::cout << curTick() << "\t" << name() << "\trecvTR before hasSharers " << pkt->hasSharers() << "\t" << pkt->fromCache() << "\n";
+//        if (pkt->isRead() && pkt->fromCache()) {
+//        	pkt->setHasSharers();
+//        }
+//        std::cout << curTick() << "\t" << name() << "\trecvTR after hasSharers " << pkt->hasSharers() << "\t" << pkt->fromCache() << "\n";
+    	cpuSidePort->schedTimingResp(pkt1, clockEdge(forwardingLatency), true);
+    			}
+    	return true;
+    }
 
     if(isCacheAccessBusy()) {
     	cpuSidePort->addPort2Queue(pkt, 2);
@@ -1690,9 +1646,6 @@ Cache::recvTimingResp(PacketPtr pkt)
     }
     else {
     	allowCacheAccessAt = clockEdge(responseLatency);
-//    	std::cout << "Response latency " << allowCacheAccessAt << "\n";
-//    	std::cout << "Forward latency " << (clockEdge(forwardLatency) +pkt->payloadDelay) << "\n";
-//    	std::cout << "payLoad latency " << pkt->payloadDelay << " headerDelay " << pkt->headerDelay << "\n";
     	setCacheAccessBusy();
 //        if(name().find("l3") != std::string::npos) {
 //        	std::cout << curTick() << "\t" << name() << "\tResponse " << pkt->getAddr() << "\t" << pkt->req->rid << "\n";
@@ -1712,7 +1665,25 @@ Cache::recvTimingResp(PacketPtr pkt)
 
     // we have dealt with any (uncacheable) writes above, from here on
     // we know we are dealing with an MSHR due to a miss or a prefetch
-    MSHR *mshr = dynamic_cast<MSHR*>(pkt->popSenderState());
+
+    std::cout << curTick() << "\t" << name() << "\tNow filling cache from transmitList\n";
+    std::cout << curTick() << "\t" << name() << "\t" << pkt->req->rid << "\tpopSenderstate " << pkt->senderState << "\n";
+
+//    MSHR *mshr = dynamic_cast<MSHR*>(pkt->popSenderState());
+    MSHR *mshr;
+    std::cout << curTick() <<"  ----------MSHR contains-----------\n";
+    std::cout << name() << "\tmshrQueue size: " << mshrQueue.allocatedList.size() << "\tSearching entry " << pkt->req->rid << "\n";
+    for (auto i = mshrQueue.allocatedList.begin(); i != mshrQueue.allocatedList.end(); ++i) {
+    	std::cout << curTick() << "\tmshr " << *i << "\t" << (*i)->getTarget()->pkt->req->rid << "\n";
+    	if((*i)->getTarget()->pkt->req->rid == pkt->req->rid) {
+    		mshr = *i;
+//    		std::cout << name() << "\tmshr entry found " << mshr->getTarget()->pkt->req->rid<< "\n";
+    	}
+    }
+//    std::cout << name() << "\tmshr entry found \n";
+    std::cout << name() << "\tmshr entry found " << mshr->getTarget()->pkt->req->rid<< "\n";
+
+    std::cout << name() << "\thasSharers " << pkt->hasSharers() << "\n";
     assert(mshr);
 
     if (mshr == noTargetMSHR) {
@@ -1767,6 +1738,7 @@ Cache::recvTimingResp(PacketPtr pkt)
                 pkt->getAddr());
 
         blk = handleFill(pkt, blk, writebacks, mshr->allocOnFill());
+        std:: cout << curTick() << "\t" << name() << "\thandleFill in resp 1 " << blk  << "\t" << blk->status << "\n";
         assert(blk != nullptr);
     }
 
@@ -1776,6 +1748,8 @@ Cache::recvTimingResp(PacketPtr pkt)
 
     // First offset for critical word first calculations
     int initial_offset = initial_tgt->pkt->getOffset(blkSize);
+
+    std:: cout << curTick() << "\t" << name() << "\thandleFill set block status 1 " <<pkt->req->rid << "\t" << blk  << "\t" << blk->status << "\n";
 
     bool from_cache = false;
     MSHR::TargetList targets = mshr->extractServiceableTargets(pkt);
@@ -1810,6 +1784,7 @@ Cache::recvTimingResp(PacketPtr pkt)
             // keep track of whether we have responded to another
             // cache
             from_cache = from_cache || tgt_pkt->fromCache();
+            std::cout << curTick() << "\t" << name() << "\t tgtpkt fromCache " << tgt_pkt->fromCache() << "\n";
 
             // unlike the other packet flows, where data is found in other
             // caches or memory and brought back, write-line requests always
@@ -1835,6 +1810,8 @@ Cache::recvTimingResp(PacketPtr pkt)
 
             if (is_fill) {
                 satisfyRequest(tgt_pkt, blk, true, mshr->hasPostDowngrade());
+
+                std::cout << curTick() << "\t" << name() << "\t after satisfyRequest in recvTR " << tgt_pkt->req->rid << "\t" << *(blk->data) << "\t" << blk->task_id << "\t" << blk->asid << "\t" << blk->tag << "\t" << blk->set << "\t" << blk->way << "\t" << blk->size << "\t" << blk->status << "\n" ;
 
                 // How many bytes past the first request is this one
                 int transfer_offset =
@@ -1933,8 +1910,13 @@ Cache::recvTimingResp(PacketPtr pkt)
             }
             // Reset the bus additional time as it is now accounted for
             tgt_pkt->headerDelay = tgt_pkt->payloadDelay = 0;
+            std:: cout << curTick() << "\t" << name() << "\thandleFill set block status 2 " <<pkt->req->rid << "\t" << blk  << "\t" << blk->status << "\n";
+
 //            std::cout << "completion_time (before sending a resp) " << completion_time << "\n";
-            cpuSidePort->schedTimingResp(tgt_pkt, completion_time, true);
+            if(name().find("icache") != std::string::npos || name().find("dcache") != std::string::npos) {
+            	cpuSidePort->schedTimingResp(tgt_pkt, completion_time, true);
+            }
+//            cpuSidePort->schedTimingResp(tgt_pkt, completion_time, true);
             break;
 
           case MSHR::Target::FromPrefetcher:
@@ -1971,9 +1953,10 @@ Cache::recvTimingResp(PacketPtr pkt)
     }
 
 
-//    std::cout <<"**********Printing Cache status after RESPONSE***********\n";
-//    std::cout << tags->print();
-//    std::cout << "******************\n";
+		std::cout << curTick() << "\t" << name() << "\n";
+    std::cout <<"**********Printing Cache status after RESPONSE***********\n";
+    std::cout << tags->print();
+    std::cout << "******************\n";
 
     DPRINTF(DelayPath, "%#llx \t %#llx \t %#llx \t %s \t Response\n", curTick(), pkt->req->rid, pkt->getAddr(),name());
     addToDelayPath(pkt->req->rid, pkt->getAddr(), forward_time, name()+".access", "Resp", false, 2);
@@ -2059,6 +2042,8 @@ Cache::recvTimingResp(PacketPtr pkt)
     }
 
     DPRINTF(CacheVerbose, "%s: Leaving with %s\n", __func__, pkt->print());
+    std::cout << name() << "\t deleting packet with details as follows:\n";
+    std::cout << pkt->print();
     delete pkt;
     return true;
 }
@@ -2273,6 +2258,7 @@ Cache::handleFill(PacketPtr pkt, CacheBlk *blk, PacketList &writebacks,
         // with the temporary storage
         blk = allocate ? allocateBlock(addr, is_secure, writebacks) : nullptr;
 
+        std:: cout << curTick() << "\t" << name() << "\thandleFill 1 " << blk  << "\t" << blk->status << "\t" << pkt->cmdString() << "\n";
         if (blk == nullptr) {
             // No replaceable block or a mostly exclusive
             // cache... just use temporary storage to complete the
@@ -2303,6 +2289,7 @@ Cache::handleFill(PacketPtr pkt, CacheBlk *blk, PacketList &writebacks,
         blk->status |= BlkSecure;
 
     blk->status |= BlkValid | BlkReadable;
+    std:: cout << curTick() << "\t" << name() << "\thandleFill 2 " << blk  << "\t" << blk->status << "\t" << pkt->cmdString() << "\n";
 
     // sanity check for whole-line writes, which should always be
     // marked as writable as part of the fill, and then later marked
@@ -2323,6 +2310,7 @@ Cache::handleFill(PacketPtr pkt, CacheBlk *blk, PacketList &writebacks,
         // cache) even in a read-only cache, note that we set this bit
         // even for a read-only cache, possibly revisit this decision
         blk->status |= BlkWritable;
+        std:: cout << curTick() << "\t" << name() << "\thandleFill 3 " << blk  << "\t" << blk->status << "\t" << pkt->cmdString() << "\n";
 
         // check if we got this via cache-to-cache transfer (i.e., from a
         // cache that had the block in Modified or Owned state)
@@ -2330,10 +2318,13 @@ Cache::handleFill(PacketPtr pkt, CacheBlk *blk, PacketList &writebacks,
             // we got the block in Modified state, and invalidated the
             // owners copy
             blk->status |= BlkDirty;
+            std:: cout << curTick() << "\t" << name() << "\thandleFill 4 " << blk  << "\t" << blk->status << "\t" << pkt->cmdString() << "\n";
 
             chatty_assert(!isReadOnly, "Should never see dirty snoop response "
                           "in read-only cache %s\n", name());
         }
+        std:: cout << curTick() << "\t" << name() << "\thandleFill 5 " << blk  << "\t" << blk->status << "\t" << pkt->cmdString() << "\n";
+
     }
 
     DPRINTF(Cache, "Block addr %#llx (%s) moving from state %x to %s\n",
@@ -2993,6 +2984,7 @@ Cache::sendMSHRQueuePacket(MSHR* mshr)
     // play it safe and append (rather than set) the sender state,
     // as forwarded packets may already have existing state
     pkt->pushSenderState(mshr);
+//    std::cout << curTick() << "\t" << name() << "\t" << pkt->req->rid << "\tpushSenderstate " << pkt->senderState << "\n";
 
     if (!memSidePort->sendTimingReq(pkt)) {
         // we are awaiting a retry, but we
@@ -3211,7 +3203,7 @@ Cache::CpuSidePort::getAddrRanges() const
 void
 Cache::CpuSidePort::addPort2Queue(PacketPtr pkt, uint64_t portType)
 {
-    	std::cout << curTick() << "\t" << name() << "\tcan Add in PortQ? " << pkt->req->rid << "\t" << portType << "\n";
+//    	std::cout << curTick() << "\t" << name() << "\tcan Add in PortQ? " << pkt->req->rid << "\t" << portType << "\n";
 //    	cache->printPortSideQueue();
 	if(cache->canAddPort2Queue(pkt, portType)) {
 		portTypeQueue ptq;
@@ -3222,7 +3214,7 @@ Cache::CpuSidePort::addPort2Queue(PacketPtr pkt, uint64_t portType)
 
 //    if(name().find("l3") != std::string::npos) {
 //    	std::cout << "Updated port queue at L3: \n";
-    	cache->printPortSideQueue();
+//    	cache->printPortSideQueue();
 //    }
 }
 

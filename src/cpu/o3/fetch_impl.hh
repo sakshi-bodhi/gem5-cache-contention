@@ -387,8 +387,10 @@ DefaultFetch<Impl>::processCacheCompletion(PacketPtr pkt)
 
     // Only change the status if it's still waiting on the icache access
     // to return.
+    std::cout << "In fetch receiving response for: " << fetchStatus[tid] << "\t" << IcacheWaitResponse << "\t" << memReq[tid] << "\t" << pkt->req << "\n";
     if (fetchStatus[tid] != IcacheWaitResponse ||
         pkt->req != memReq[tid]) {
+//    if (fetchStatus[tid] != IcacheWaitResponse) {
         ++fetchIcacheSquashes;
         delete pkt->req;
         delete pkt;
@@ -397,7 +399,11 @@ DefaultFetch<Impl>::processCacheCompletion(PacketPtr pkt)
         return;
     }
 
+//    std ::cout << curTick() << "\t" << name() << "\t processCacheCompletion " << pkt->data << "\t" << *fetchBuffer[tid] << "\t" << fetchBufferSize << "\n" ;
     memcpy(fetchBuffer[tid], pkt->getConstPtr<uint8_t>(), fetchBufferSize);
+//    std ::cout << curTick() << "\t" << name() << "\t processCacheCompletion " << pkt->data << "\t" << *fetchBuffer[tid] << "\t" << fetchBufferSize << "\n" ;
+
+
     fetchBufferValid[tid] = true;
 
     // Wake up the CPU (if it went to sleep and was waiting on
@@ -660,6 +666,10 @@ DefaultFetch<Impl>::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
 
     memReq[tid] = mem_req;
 
+    for (ThreadID tid = 0; tid < numThreads; ++tid) {
+    	std::cout << name() << " tid " << tid << " req ptr " << memReq[tid] << "\n";
+    }
+    std::cout << curTick() << "\t" << name() << " Checking the req ptr while creating\t" << mem_req << "\taddr " << fetchBufferBlockPC << "\n";
     //-----CHANGED----
 //           std::cout << "fetchCacheLine(): mem_req=" << mem_req << "\n";
 //    std::cout << "delay_path \tStage2 \t"  << curTick() << "\t" << mem_req->masterId() << "\n";
@@ -670,6 +680,8 @@ DefaultFetch<Impl>::fetchCacheLine(Addr vaddr, ThreadID tid, Addr pc)
     // Initiate translation of the icache block
     fetchStatus[tid] = ItlbWait;
     FetchTranslation *trans = new FetchTranslation(this);
+
+    std::cout << curTick() << "\t" << name() << "\t" << mem_req << "\t" << mem_req->rid << "\n";
     cpu->itb->translateTiming(mem_req, cpu->thread[tid]->getTC(),
                               trans, BaseTLB::Execute);
     return true;
@@ -1033,6 +1045,8 @@ DefaultFetch<Impl>::tick()
                     "fetch queue. Fetch queue size: %i.\n",
                     tid, inst->seqNum, fetchQueue[tid].size());
 
+            std::cout << curTick() << "\t" << name() << "\tinst adding to decode is: " << inst->staticInst->disassemble(inst->pcState().instAddr()) << "\t" << inst->pcState() << "\t" << inst->seqNum << "\n";
+
             wroteToTimeBuffer = true;
             fetchQueue[tid].pop_front();
             insts_to_decode++;
@@ -1166,6 +1180,8 @@ DefaultFetch<Impl>::buildInst(ThreadID tid, StaticInstPtr staticInst,
                               StaticInstPtr curMacroop, TheISA::PCState thisPC,
                               TheISA::PCState nextPC, bool trace)
 {
+
+	std::cout << "parameters to buildInst " << tid << "\t" << staticInst << "\t" << curMacroop << "\t" << thisPC << "\t" << nextPC << "\t" << trace << "\n";
     // Get a sequence number.
     InstSeqNum seq = cpu->getAndIncrementInstSeq();
 
@@ -1185,6 +1201,8 @@ DefaultFetch<Impl>::buildInst(ThreadID tid, StaticInstPtr staticInst,
     DPRINTF(Fetch, "[tid:%i]: Instruction is: %s\n", tid,
             instruction->staticInst->
             disassemble(thisPC.instAddr()));
+
+    std::cout << curTick() << "\t" << name() << "\tbuildInst is: " << instruction->staticInst->disassemble(instruction->pcState().instAddr()) << "\t" << instruction->pcState() << "\t" << instruction->seqNum << "\n";
 
 #if TRACING_ON
     if (trace) {
@@ -1289,7 +1307,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             DPRINTF(Fetch, "[tid:%i]: Attempting to translate and read "
                     "instruction, starting at PC %s.\n", tid, thisPC);
 
-//            std::cout << "Current PC: " << thisPC << "\n";
+            std::cout << curTick() << "\t" << name() << "\t before fetchCacheLine thisPC: " << thisPC << "\n";
             fetchCacheLine(fetchAddr, tid, thisPC.instAddr());
 
             if (fetchStatus[tid] == IcacheWaitResponse)
@@ -1401,6 +1419,8 @@ DefaultFetch<Impl>::fetch(bool &status_change)
                 if (decoder[tid]->instReady()) {
                     staticInst = decoder[tid]->decode(thisPC);
 
+                    std::cout << curTick() << "\t" << name() << "\tstaticInst 1 is: " << staticInst->disassemble(thisPC.instAddr()) << "\t" << thisPC << "\n";
+
                     // Increment stat of fetched instructions.
                     ++fetchedInsts;
 
@@ -1423,15 +1443,24 @@ DefaultFetch<Impl>::fetch(bool &status_change)
                 if (inRom) {
                     staticInst = cpu->microcodeRom.fetchMicroop(
                             thisPC.microPC(), curMacroop);
+
+                    std::cout << curTick() << "\t" << name() << "\tstaticInst 2 is: " << staticInst->disassemble(thisPC.instAddr()) << "\t" << thisPC << "\n";
+
                 } else {
                     staticInst = curMacroop->fetchMicroop(thisPC.microPC());
+                    std::cout << curTick() << "\t" << name() << "\tstaticInst 3 is: " << staticInst->disassemble(thisPC.instAddr()) << "\t" << thisPC << "\n";
+
                 }
                 newMacro |= staticInst->isLastMicroop();
             }
 
+            std::cout << curTick() << "\t" << name() << "\tstaticInst is: " << staticInst->disassemble(thisPC.instAddr()) << "\t" << thisPC << "\n";
+
             DynInstPtr instruction =
                 buildInst(tid, staticInst, curMacroop,
                           thisPC, nextPC, true);
+
+            std::cout << curTick() << "\t" << name() << "\tinst is: " << instruction->staticInst->disassemble(instruction->pcState().instAddr()) << "\t" << instruction->pcState() << "\t" << instruction->seqNum << "\n";
 
             ppFetch->notify(instruction);
             numInst++;

@@ -98,7 +98,7 @@ WriteQueue::allocateL3RQ(WriteQueueEntry *wb_entry, std::string cacheName)
 {
 	int Qsize = 0;
 //	if(timer < 11) {
-	std::cout << name() << " WB entry " << wb_entry << "\t" << readyList.size() << "\n";
+//	std::cout << name() << " WB entry " << wb_entry << "\t" << readyList.size() << "\n";
         for (auto i = readyList.begin(); i != readyList.end(); ++i) {
 //	        	std::cout << "wb_entry " << *i << "\t" <<  curTick() << "\t" << (*i)->readyTime << "\n";
         	if((*i)->readyTime <= curTick()) {

@@ -651,8 +651,8 @@ class BaseCache : public MemObject
     			continue;
     		}
     	}
-    	std::cout << "Port queue after prioritization\n";
-    	printPortSideQueue();
+//    	std::cout << "Port queue after prioritization\n";
+//    	printPortSideQueue();
     }
 
     /**

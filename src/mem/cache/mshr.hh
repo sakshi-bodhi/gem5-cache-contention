@@ -341,6 +341,10 @@ class MSHR : public QueueEntry, public Printable
     Target *getTarget()
     {
         assert(hasTargets());
+//        std::cout << "targetList size: " << targets.size() << "\n";
+//        for (auto i = targets.begin(); i != targets.end(); ++i) {
+//        	std::cout << curTick() << "\tmshr target" << *i << "\t" << (*i)->pkt->req->rid << "\n";
+//        }
         return &targets.front();
     }
 

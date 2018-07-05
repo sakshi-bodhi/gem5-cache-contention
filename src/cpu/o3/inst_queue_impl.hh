@@ -574,6 +574,8 @@ InstructionQueue<Impl>::insert(DynInstPtr &new_inst)
     DPRINTF(IQ, "Adding instruction [sn:%lli] PC %s to the IQ.\n",
             new_inst->seqNum, new_inst->pcState());
 
+    std::cout << curTick() << "\t" << name() << "\tinst is: " << new_inst->staticInst->disassemble(new_inst->pcState().instAddr()) << "\t" << new_inst->pcState() << "\t" << new_inst->seqNum << "\n";
+
     assert(freeEntries != 0);
 
     instList[new_inst->threadNumber].push_back(new_inst);

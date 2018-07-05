@@ -132,6 +132,7 @@ AddrMapper::recvTimingReq(PacketPtr pkt)
         pkt->setAddr(orig_addr);
 
         if (needsResponse) {
+        	std::cout << name() << "\t recvTimingReq addrMapper\n";
             delete pkt->popSenderState();
         }
     }

@@ -719,6 +719,8 @@ DefaultDecode<Impl>::decodeInsts(ThreadID tid)
             continue;
         }
 
+        std::cout << curTick() << "\t" << name() << "\tinst is: " << inst->staticInst->disassemble(inst->pcState().instAddr()) << "\t" << inst->pcState() << "\t" << inst->seqNum << "\n";
+
         // Also check if instructions have no source registers.  Mark
         // them as ready to issue at any time.  Not sure if this check
         // should exist here or at a later stage; however it doesn't matter

@@ -1042,6 +1042,9 @@ DefaultCommit<Impl>::commitInsts()
 
         head_inst = rob->readHeadInst(commit_thread);
 
+        std::cout << curTick() << "\t" << name() << "\tinst is: " << head_inst->staticInst->disassemble(head_inst->pcState().instAddr()) << "\t" << head_inst->pcState() << "\t" << head_inst->seqNum << "\n";
+
+
         ThreadID tid = head_inst->threadNumber;
 
         assert(tid == commit_thread);
@@ -1231,6 +1234,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
     }
 
     // Check if the instruction caused a fault.  If so, trap.
+    std::cout << "inst is: " << head_inst->staticInst->disassemble(head_inst->pcState().instAddr()) << "\n";
     Fault inst_fault = head_inst->getFault();
 
     // Stores mark themselves as completed.
@@ -1268,6 +1272,8 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
         // needed to update the state as soon as possible.  This
         // prevents external agents from changing any specific state
         // that the trap need.
+
+        std::cout << name() << " fault is " << inst_fault << "\t" << head_inst->getFault()->name() << "\n";
         cpu->trap(inst_fault, tid, head_inst->staticInst);
 
         // Exit state update mode to avoid accidental updating.

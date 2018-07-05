@@ -187,7 +187,7 @@ std::map<int, L3QStatusVector> L3QCompleteStatus;
 std::vector<coreStatus> last_entry_vector;
 
 //variables
-bool recordStatusFlag = false;
+bool recordStatusFlag = true;
 bool recordL3StatusFlag = true;
 
 uint64_t writeAfter = 1000;

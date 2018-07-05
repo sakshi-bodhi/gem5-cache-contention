@@ -438,6 +438,11 @@ CoherentXBar::recvTimingResp(PacketPtr pkt, PortID master_port_id)
            }
            //    -----CHANGED----
 
+           if(!pkt->isForwarded) {
+        	   pkt->isCacheForwarded = true;
+        	   return true;
+           }
+
     // determine the destination
     const auto route_lookup = routeTo.find(pkt->req);
 //    std::cout << "route_lookup " << route_lookup->first	 << "\t" << route_lookup->second << "\n";
@@ -521,7 +526,11 @@ CoherentXBar::recvTimingResp(PacketPtr pkt, PortID master_port_id)
 //    std::cout << "TEST_RESP\t" << curTick() << "\tResponse is going\t" << name() << "\t" << pkt->getAddr() << "\t" << pkt->req << "\t" << pkt->req->rid << "\t" << pkt->req->masterId() << "\n";
 //    std::cout << "TEST_RESP\t" << "RespLayer slavePort id " << slave_port_id << "\t latency added: " << latency << "\n";
 
-    slavePorts[slave_port_id]->schedTimingResp(pkt, curTick() + latency);
+    std::cout << curTick() << "\t" << name() << "\t" << pkt->req->rid << "\tpkt->headerDelay is " << latency << "\t" << packetFinishTime << "\n";
+//    slavePorts[slave_port_id]->schedTimingResp(pkt, curTick() + latency);
+
+    slavePorts[slave_port_id]->schedTimingResp(pkt, packetFinishTime);
+//    masterPorts[master_port_id]->addPort2Q(pkt, 2);
 
     // remove the request from the routing table
     routeTo.erase(route_lookup);
